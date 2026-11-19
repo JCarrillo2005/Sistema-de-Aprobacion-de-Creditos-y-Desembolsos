@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
   type FormEvent,
@@ -28,6 +29,11 @@ const EMPTY_FORM: RequestFormValues = {
   termMonths: "12",
 };
 
+interface FieldStatus {
+  tone: "ok" | "error";
+  text: string;
+}
+
 interface TextFieldProps {
   label: string;
   name: RequestFormField;
@@ -35,6 +41,7 @@ interface TextFieldProps {
   error?: string;
   hint?: string;
   prefix?: string;
+  status?: FieldStatus;
   inputProps?: InputHTMLAttributes<HTMLInputElement>;
   onChange: (value: string) => void;
   onBlur: () => void;
@@ -47,11 +54,17 @@ function TextField({
   error,
   hint,
   prefix,
+  status,
   inputProps,
   onChange,
   onBlur,
 }: TextFieldProps) {
   const errorId = `${name}-error`;
+  const statusId = `${name}-status`;
+  const describedBy = [error ? errorId : null, status ? statusId : null]
+    .filter((value): value is string => value !== null)
+    .join(" ");
+
   return (
     <div className={error ? "field field-invalid" : "field"}>
       <label htmlFor={name}>{label}</label>
@@ -62,20 +75,40 @@ function TextField({
           name={name}
           value={value}
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
+          aria-describedby={describedBy || undefined}
           onChange={(event) => onChange(event.target.value)}
           onBlur={onBlur}
           {...inputProps}
         />
       </div>
-      {hint && !error && <small className="muted">{hint}</small>}
+      {hint && !error && !status && <small className="muted">{hint}</small>}
       {error && (
         <small id={errorId} className="field-error">
           {error}
         </small>
       )}
+      {status && (
+        <small
+          id={statusId}
+          className={`field-status field-status--${status.tone}`}
+          aria-live="polite"
+        >
+          {`${status.tone === "ok" ? "✓" : "!"} ${status.text}`}
+        </small>
+      )}
     </div>
   );
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
 }
 
 interface CapacityMeterProps {
@@ -153,6 +186,25 @@ export default function NewRequestPage() {
     [values],
   );
 
+  const debouncedDocument = useDebouncedValue(values.documentId, 250);
+  const documentStatus = useMemo<FieldStatus | null>(() => {
+    if (debouncedDocument.trim().length === 0) {
+      return null;
+    }
+    // Se reutiliza la misma validación del formulario: no se duplica ninguna regla.
+    const debouncedErrors = validateRequestForm({
+      ...values,
+      documentId: debouncedDocument,
+    }).errors;
+    if (debouncedErrors.documentId) {
+      return { tone: "error", text: debouncedErrors.documentId };
+    }
+    return {
+      tone: "ok",
+      text: `Formato válido · se registrará como ${debouncedDocument.trim().toUpperCase()}`,
+    };
+  }, [debouncedDocument, values]);
+
   const incomeNumber = parseNumber(values.monthlyIncome);
   const amountNumber = parseNumber(values.amount);
   const termNumber = parseNumber(values.termMonths);
@@ -174,7 +226,9 @@ export default function NewRequestPage() {
   }
 
   function update(field: RequestFormField, value: string) {
-    setValues((previous) => ({ ...previous, [field]: value }));
+    // El backend ya normaliza el documento; hacerlo aquí evita sorpresas al guardar.
+    const nextValue = field === "documentId" ? value.toUpperCase() : value;
+    setValues((previous) => ({ ...previous, [field]: nextValue }));
     if (createRequest.isError) {
       createRequest.reset();
     }
@@ -240,6 +294,9 @@ export default function NewRequestPage() {
               value={values.documentId}
               error={visibleError("documentId")}
               hint="Letras, números y guiones · 5 a 20 caracteres"
+              status={
+                visibleError("documentId") ? undefined : (documentStatus ?? undefined)
+              }
               onChange={(value) => update("documentId", value)}
               onBlur={() => markTouched("documentId")}
               inputProps={{ maxLength: 20, placeholder: "Ej. DPI-1234567", spellCheck: false }}

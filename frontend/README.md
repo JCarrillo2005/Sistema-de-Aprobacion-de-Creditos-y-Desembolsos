@@ -75,6 +75,9 @@ documentos y timestamps usan siempre tipografía monoespaciada con
 - **Estados:** `StatusBadge` y `StatusCode` fijan la semántica de `CREADA`,
   `EN_REVISION`, `APROBADA` y `RECHAZADA`. El `LifecycleStepper` muestra el
   ciclo permitido sin reversiones.
+- **Identificación:** el documento se normaliza a mayúsculas mientras se escribe
+  y muestra su estado de formato en vivo (los mismos mensajes de `lib/rules.ts`),
+  sin duplicar reglas ni bloquear el envío antes de tiempo.
 - **Originación:** vista dividida con simulador sticky, medidor de capacidad
   en tiempo real (40 % del ingreso) y cronograma francés colapsable. Las
   reglas viven en `lib/rules.ts` y `lib/amortization.ts`.

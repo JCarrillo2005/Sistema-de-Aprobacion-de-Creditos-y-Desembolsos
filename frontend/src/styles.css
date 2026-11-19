@@ -760,6 +760,16 @@ input[type="number"] {
 .field-error {
   color: var(--rechazada-fg);
 }
+.field-status {
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+}
+.field-status--ok {
+  color: var(--aprobada-fg);
+}
+.field-status--error {
+  color: var(--rechazada-fg);
+}
 .field-invalid input,
 .field-invalid select,
 .field-invalid textarea {
