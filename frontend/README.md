@@ -55,10 +55,39 @@ src/
 ├── App.tsx                  # Rutas y protección por rol
 ├── api/                     # tipos, cliente HTTP, endpoints y hooks de TanStack Query
 ├── auth/                    # sesión (token + /auth/me) y ProtectedRoute
-├── components/              # Layout, badges, amortización y panel del buró
+├── components/              # shell, presupuesto, estados, ciclo de vida, buró y simulador
 ├── lib/                     # reglas, amortización, formato y rutas
 └── pages/                   # login, solicitudes, panel de analista y auditoría
 ```
+
+## Diseño e interacción
+
+La interfaz sigue una estética _Modern Institutional Ledger_: fondos neutros,
+bordes de 1 px, sin sombras decorativas y sin dependencias de UI externas
+(todo se resuelve en `styles.css` con tokens CSS). Los montos, tasas, plazos,
+documentos y timestamps usan siempre tipografía monoespaciada con
+`font-variant-numeric: tabular-nums`.
+
+- **Shell:** barra lateral con navegación, selector rápido de sesión demo y
+  widget de presupuesto global para analistas; la barra superior muestra el
+  módulo activo, la sesión y un indicador compacto del presupuesto. El widget
+  comparte la misma query de TanStack Query, sin copias en estado local.
+- **Estados:** `StatusBadge` y `StatusCode` fijan la semántica de `CREADA`,
+  `EN_REVISION`, `APROBADA` y `RECHAZADA`. El `LifecycleStepper` muestra el
+  ciclo permitido sin reversiones.
+- **Originación:** vista dividida con simulador sticky, medidor de capacidad
+  en tiempo real (40 % del ingreso) y cronograma francés colapsable. Las
+  reglas viven en `lib/rules.ts` y `lib/amortization.ts`.
+- **Analista:** bandeja con filtros rápidos, antigüedad y ratio de
+  endeudamiento; panel del buró con estados idle/carga/error/éxito sin
+  bloquear la navegación; zona de dictamen con alerta preventiva de
+  presupuesto (HTTP 422) y contador de 15 caracteres para el rechazo.
+- **Auditoría:** bitácora densa con transiciones `ORIGEN → DESTINO`, actor,
+  timestamp legible (ISO 8601 en `title`), distintivo de inmutabilidad y
+  polling con indicador de sincronización.
+
+No se añadieron dependencias: iconografía, skeleton, medidores y stepper se
+resuelven con CSS y componentes ligeros propios.
 
 ## Notas
 

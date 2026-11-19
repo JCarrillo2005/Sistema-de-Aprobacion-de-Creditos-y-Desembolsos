@@ -34,49 +34,88 @@ export default function LoginPage() {
   const users = usersQuery.data ?? [];
 
   return (
-    <div className="login-page">
-      <div className="card login-card">
-        <h1>Créditos y Desembolsos</h1>
-        <p className="muted">
-          Selector de usuarios de prueba. En producción esto se reemplazaría por
+    <div className="login-shell">
+      <section className="login-aside" aria-label="Acerca del sistema">
+        <div>
+          <span className="eyebrow">Consola de crédito · entorno de prueba</span>
+          <h1>Aprobación de créditos y desembolsos</h1>
+          <p className="login-lede">
+            Una bitácora operativa para originar, evaluar y comprometer
+            desembolsos con trazabilidad completa.
+          </p>
+        </div>
+        <dl className="login-facts">
+          <div>
+            <dt>Regla de capacidad</dt>
+            <dd className="mono">40 % del ingreso mensual</dd>
+          </div>
+          <div>
+            <dt>Presupuesto global</dt>
+            <dd className="mono">$50,000.00 USD</dd>
+          </div>
+          <div>
+            <dt>Auditoría</dt>
+            <dd className="mono">Solo inserción · inmutable</dd>
+          </div>
+        </dl>
+        <p className="fineprint">
+          Selector de usuarios sembrados. En producción se sustituiría por
           credenciales reales o SSO.
         </p>
+      </section>
 
-        {usersQuery.isLoading && <p role="status">Cargando usuarios…</p>}
-        {usersQuery.isError && (
-          <div className="alert alert-error" role="alert">
-            {usersQuery.error.message}
+      <main className="login-main">
+        <div className="panel login-panel">
+          <div className="panel-head">
+            <div>
+              <span className="eyebrow">Acceso</span>
+              <h2>Selecciona una sesión</h2>
+            </div>
+            <span className="immutable-badge mono">DEMO</span>
           </div>
-        )}
-        {error && (
-          <div className="alert alert-error" role="alert">
-            {error}
-          </div>
-        )}
 
-        <ul className="login-list">
-          {users.map((candidate) => (
-            <li key={candidate.id}>
-              <button
-                type="button"
-                className="login-option"
-                disabled={pendingId !== null}
-                onClick={() => void handleLogin(candidate.id)}
-              >
-                <span>
-                  <strong>{candidate.name}</strong>
-                  <small>{candidate.id}</small>
-                </span>
-                <span
-                  className={`role-badge role-${candidate.role.toLowerCase()}`}
+          {usersQuery.isLoading && (
+            <div className="page-state" role="status">
+              <span className="spinner" aria-hidden="true" />
+              Cargando usuarios…
+            </div>
+          )}
+          {usersQuery.isError && (
+            <div className="alert alert-error" role="alert">
+              {usersQuery.error.message}
+            </div>
+          )}
+          {error && (
+            <div className="alert alert-error" role="alert">
+              {error}
+            </div>
+          )}
+
+          <ul className="login-list">
+            {users.map((candidate) => (
+              <li key={candidate.id}>
+                <button
+                  type="button"
+                  className="login-option"
+                  disabled={pendingId !== null}
+                  onClick={() => void handleLogin(candidate.id)}
                 >
-                  {candidate.role}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+                  <span className="login-option-id mono">{candidate.id}</span>
+                  <span className="login-option-name">{candidate.name}</span>
+                  <span
+                    className={`role-badge role-${candidate.role.toLowerCase()}`}
+                  >
+                    {candidate.role}
+                  </span>
+                  {pendingId === candidate.id && (
+                    <span className="spinner" aria-hidden="true" />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </main>
     </div>
   );
 }

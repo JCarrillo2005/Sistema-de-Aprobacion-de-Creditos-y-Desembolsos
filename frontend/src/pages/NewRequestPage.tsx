@@ -5,12 +5,14 @@ import {
   type InputHTMLAttributes,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { useBureauCheck, useCreateRequest } from "../api/hooks";
 import { ApiError } from "../api/client";
+import { useBureauCheck, useCreateRequest } from "../api/hooks";
 import { AmortizationTable } from "../components/AmortizationTable";
-import { formatMoney } from "../lib/format";
+import { formatMoney, formatPercent } from "../lib/format";
 import {
   ALLOWED_TERMS,
+  capacityUsedPercent,
+  debtRatioPercent,
   maxAllowedAmount,
   parseNumber,
   validateRequestForm,
@@ -32,6 +34,7 @@ interface TextFieldProps {
   value: string;
   error?: string;
   hint?: string;
+  prefix?: string;
   inputProps?: InputHTMLAttributes<HTMLInputElement>;
   onChange: (value: string) => void;
   onBlur: () => void;
@@ -43,6 +46,7 @@ function TextField({
   value,
   error,
   hint,
+  prefix,
   inputProps,
   onChange,
   onBlur,
@@ -51,21 +55,83 @@ function TextField({
   return (
     <div className={error ? "field field-invalid" : "field"}>
       <label htmlFor={name}>{label}</label>
-      <input
-        id={name}
-        name={name}
-        value={value}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        onBlur={onBlur}
-        {...inputProps}
-      />
+      <div className={prefix ? "input-wrap input-has-prefix" : "input-wrap"}>
+        {prefix && <span className="input-prefix mono">{prefix}</span>}
+        <input
+          id={name}
+          name={name}
+          value={value}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          {...inputProps}
+        />
+      </div>
       {hint && !error && <small className="muted">{hint}</small>}
       {error && (
         <small id={errorId} className="field-error">
           {error}
         </small>
+      )}
+    </div>
+  );
+}
+
+interface CapacityMeterProps {
+  income: number | null;
+  amount: number | null;
+}
+
+function CapacityMeter({ income, amount }: CapacityMeterProps) {
+  const max = income !== null ? maxAllowedAmount(income) : null;
+  const usage = income !== null && amount !== null ? capacityUsedPercent(amount, income) : null;
+  const ratio = income !== null && amount !== null ? debtRatioPercent(amount, income) : null;
+  const exceeded = usage !== null && usage > 100;
+  const width = Math.max(0, Math.min(usage ?? 0, 100));
+
+  return (
+    <div className={exceeded ? "capacity capacity--over" : "capacity"}>
+      <div className="capacity-head">
+        <span className="eyebrow">Capacidad de endeudamiento</span>
+        <strong className="mono">{usage !== null ? formatPercent(usage, 0) : "—"}</strong>
+      </div>
+      <div
+        className="capacity-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(width)}
+        aria-label="Uso del límite de endeudamiento"
+      >
+        <div className="capacity-fill" style={{ width: `${width}%` }} />
+        <span className="capacity-threshold" aria-hidden="true" />
+      </div>
+      <div className="capacity-scale mono">
+        <span>{formatMoney(amount ?? 0)} solicitado</span>
+        <span>{max !== null ? `${formatMoney(max)} límite` : "Límite 40 %"}</span>
+      </div>
+      <p className="capacity-note" aria-live="polite">
+        {usage === null ? (
+          "Ingresa el ingreso mensual y el monto para calcular tu capacidad."
+        ) : exceeded ? (
+          <>
+            Has excedido el límite por{" "}
+            <span className="mono">{formatMoney((amount ?? 0) - (max ?? 0))}</span>.
+            Reduce el monto o declara el ingreso real.
+          </>
+        ) : (
+          <>
+            Usando <span className="mono">{formatPercent(usage, 0)}</span> de tu
+            límite máximo permitido de{" "}
+            <span className="mono">{formatMoney(max ?? 0)}</span>.
+          </>
+        )}
+      </p>
+      {ratio !== null && (
+        <p className="capacity-subnote mono">
+          Endeudamiento {formatPercent(ratio)} del ingreso · tope normativo 40 %
+        </p>
       )}
     </div>
   );
@@ -91,16 +157,17 @@ export default function NewRequestPage() {
   const amountNumber = parseNumber(values.amount);
   const termNumber = parseNumber(values.termMonths);
 
-  const showSimulation =
-    amountNumber !== null &&
-    termNumber !== null &&
-    !errors.amount &&
-    !errors.termMonths;
-
-  const maxHint =
+  const validIncome =
     incomeNumber !== null && incomeNumber > 0 && !errors.monthlyIncome
-      ? `Máximo permitido (40 % del ingreso): ${formatMoney(maxAllowedAmount(incomeNumber))}`
-      : undefined;
+      ? incomeNumber
+      : null;
+  const positiveAmount =
+    amountNumber !== null && amountNumber > 0 ? amountNumber : null;
+
+  // El simulador sigue visible aunque el monto exceda el límite: el medidor
+  // marca el umbral en rojo y el envío permanece bloqueado.
+  const showSimulation =
+    positiveAmount !== null && termNumber !== null && !errors.termMonths;
 
   function visibleError(field: RequestFormField): string | undefined {
     return touched[field] || submitAttempted ? errors[field] : undefined;
@@ -125,7 +192,7 @@ export default function NewRequestPage() {
     }
     createRequest.mutate(valid, {
       onSuccess: (created) => {
-        // Consulta al buró en segundo plano: el usuario no queda bloqueado esperando.
+        // Consulta al buró en segundo plano: la navegación no queda bloqueada.
         bureau.mutate(created.id);
         navigate(`/requests/${created.id}`);
       },
@@ -140,124 +207,159 @@ export default function NewRequestPage() {
   return (
     <>
       <div className="page-header">
-        <h2>Nueva solicitud de desembolso</h2>
+        <div>
+          <span className="eyebrow">Originación · solicitante</span>
+          <h2>Nueva solicitud de desembolso</h2>
+        </div>
+        <span className="immutable-badge mono">VALIDACIÓN DOBLE</span>
       </div>
 
-      <div className="grid-2">
-        <form className="card" onSubmit={handleSubmit} noValidate>
-          <TextField
-            label="Nombre del solicitante"
-            name="applicantName"
-            value={values.applicantName}
-            error={visibleError("applicantName")}
-            onChange={(value) => update("applicantName", value)}
-            onBlur={() => markTouched("applicantName")}
-            inputProps={{ autoComplete: "name", maxLength: 120 }}
-          />
-          <TextField
-            label="Documento de identidad"
-            name="documentId"
-            value={values.documentId}
-            error={visibleError("documentId")}
-            hint="Letras, números y guiones (5 a 20 caracteres)"
-            onChange={(value) => update("documentId", value)}
-            onBlur={() => markTouched("documentId")}
-            inputProps={{ maxLength: 20 }}
-          />
-          <TextField
-            label="Ingreso mensual declarado (USD)"
-            name="monthlyIncome"
-            value={values.monthlyIncome}
-            error={visibleError("monthlyIncome")}
-            onChange={(value) => update("monthlyIncome", value)}
-            onBlur={() => markTouched("monthlyIncome")}
-            inputProps={{
-              type: "number",
-              min: 0,
-              step: "0.01",
-              inputMode: "decimal",
-            }}
-          />
-          <TextField
-            label="Monto solicitado (USD)"
-            name="amount"
-            value={values.amount}
-            error={visibleError("amount")}
-            hint={maxHint}
-            onChange={(value) => update("amount", value)}
-            onBlur={() => markTouched("amount")}
-            inputProps={{
-              type: "number",
-              min: 0,
-              step: "0.01",
-              inputMode: "decimal",
-            }}
-          />
-
-          <div
-            className={
-              visibleError("termMonths") ? "field field-invalid" : "field"
-            }
-          >
-            <label htmlFor="termMonths">Plazo</label>
-            <select
-              id="termMonths"
-              name="termMonths"
-              value={values.termMonths}
-              onChange={(event) => update("termMonths", event.target.value)}
-              onBlur={() => markTouched("termMonths")}
-            >
-              {ALLOWED_TERMS.map((term) => (
-                <option key={term} value={String(term)}>
-                  {term} meses
-                </option>
-              ))}
-            </select>
-            {visibleError("termMonths") && (
-              <small className="field-error">
-                {visibleError("termMonths")}
-              </small>
-            )}
+      <div className="workbench">
+        <form className="panel form-panel" onSubmit={handleSubmit} noValidate>
+          <div className="panel-head">
+            <div>
+              <span className="eyebrow">Formulario</span>
+              <h3>Datos de la solicitud</h3>
+            </div>
           </div>
+
+          <fieldset className="form-section">
+            <legend>01 · Identificación</legend>
+            <TextField
+              label="Nombre del solicitante"
+              name="applicantName"
+              value={values.applicantName}
+              error={visibleError("applicantName")}
+              onChange={(value) => update("applicantName", value)}
+              onBlur={() => markTouched("applicantName")}
+              inputProps={{ autoComplete: "name", maxLength: 120, placeholder: "Nombre completo" }}
+            />
+            <TextField
+              label="Documento de identidad"
+              name="documentId"
+              value={values.documentId}
+              error={visibleError("documentId")}
+              hint="Letras, números y guiones · 5 a 20 caracteres"
+              onChange={(value) => update("documentId", value)}
+              onBlur={() => markTouched("documentId")}
+              inputProps={{ maxLength: 20, placeholder: "Ej. DPI-1234567", spellCheck: false }}
+            />
+          </fieldset>
+
+          <fieldset className="form-section">
+            <legend>02 · Capacidad de pago</legend>
+            <TextField
+              label="Ingreso mensual declarado"
+              name="monthlyIncome"
+              value={values.monthlyIncome}
+              error={visibleError("monthlyIncome")}
+              prefix="USD"
+              onChange={(value) => update("monthlyIncome", value)}
+              onBlur={() => markTouched("monthlyIncome")}
+              inputProps={{
+                type: "number",
+                min: 0,
+                step: "0.01",
+                inputMode: "decimal",
+                placeholder: "0.00",
+              }}
+            />
+            <TextField
+              label="Monto solicitado"
+              name="amount"
+              value={values.amount}
+              error={visibleError("amount")}
+              prefix="USD"
+              onChange={(value) => update("amount", value)}
+              onBlur={() => markTouched("amount")}
+              inputProps={{
+                type: "number",
+                min: 0,
+                step: "0.01",
+                inputMode: "decimal",
+                placeholder: "0.00",
+              }}
+            />
+            <CapacityMeter income={validIncome} amount={positiveAmount} />
+          </fieldset>
+
+          <fieldset className="form-section">
+            <legend>03 · Estructura del préstamo</legend>
+            <div className={visibleError("termMonths") ? "field field-invalid" : "field"}>
+              <label htmlFor="termMonths">Plazo del crédito</label>
+              <select
+                id="termMonths"
+                name="termMonths"
+                value={values.termMonths}
+                onChange={(event) => update("termMonths", event.target.value)}
+                onBlur={() => markTouched("termMonths")}
+              >
+                {ALLOWED_TERMS.map((term) => (
+                  <option key={term} value={String(term)}>
+                    {String(term).padStart(2, "0")} meses
+                  </option>
+                ))}
+              </select>
+              {visibleError("termMonths") && (
+                <small className="field-error">{visibleError("termMonths")}</small>
+              )}
+            </div>
+            <p className="fineprint mono">PLAZOS HABILITADOS · 06 / 12 / 24 / 36 MESES</p>
+          </fieldset>
 
           {serverError && (
             <div className="alert alert-error" role="alert">
-              {isHistoryBlock && <strong>Solicitud bloqueada. </strong>}
-              {serverError.message}
+              <div className="alert-title">
+                <strong>
+                  {isHistoryBlock ? "Solicitud bloqueada por historial" : "No se pudo registrar"}
+                </strong>
+                {serverError instanceof ApiError && (
+                  <code className="mono">HTTP {serverError.status} · {serverError.code}</code>
+                )}
+              </div>
+              <p>{serverError.message}</p>
             </div>
           )}
 
-          <div className="actions">
+          <div className="form-actions">
             <button
               type="submit"
               className="btn btn-primary"
               disabled={!valid || createRequest.isPending}
+              aria-busy={createRequest.isPending}
             >
               {createRequest.isPending
-                ? "Enviando…"
+                ? "Registrando…"
                 : "Confirmar y enviar solicitud"}
             </button>
+            <p className="fineprint">
+              El servidor vuelve a validar todas las reglas antes de persistir.
+            </p>
           </div>
-          <p className="muted">
-            Revisa la simulación antes de confirmar. Las reglas se validan
-            nuevamente en el servidor.
-          </p>
         </form>
 
-        <div>
-          {showSimulation && amountNumber !== null && termNumber !== null ? (
-            <AmortizationTable
-              principal={amountNumber}
-              termMonths={termNumber}
-            />
+        <div className="simulator-column">
+          {showSimulation && positiveAmount !== null && termNumber !== null ? (
+            <AmortizationTable principal={positiveAmount} termMonths={termNumber} />
           ) : (
-            <div className="card">
-              <h3>Simulación financiera</h3>
+            <section className="panel simulator simulator--idle">
+              <div className="panel-head">
+                <div>
+                  <span className="eyebrow">Simulador en vivo</span>
+                  <h3>Proyección de pago</h3>
+                </div>
+                <span className="rate-chip mono">1.5 % / MES</span>
+              </div>
               <p className="muted">
-                Ingresa un monto válido y un plazo para ver la tabla de
-                amortización estimada.
+                Ingresa un monto válido y un plazo para calcular la cuota, los
+                intereses y el cronograma estimado.
               </p>
-            </div>
+              <div className="sim-placeholder mono" aria-hidden="true">
+                <span>$ ————</span>
+                <span>·</span>
+                <span>00 CUOTAS</span>
+              </div>
+            </section>
           )}
         </div>
       </div>

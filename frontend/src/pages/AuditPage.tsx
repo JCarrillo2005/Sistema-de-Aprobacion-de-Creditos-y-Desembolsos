@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAudit } from "../api/hooks";
+import { TransitionBadge } from "../components/TransitionBadge";
+import { formatClockTime, formatDateTime } from "../lib/format";
 
 export default function AuditPage() {
   const [requestIdInput, setRequestIdInput] = useState("");
@@ -8,90 +10,120 @@ export default function AuditPage() {
   const parsed = Number(requestIdInput);
   const requestId = Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 
-  const audit = useAudit({ requestId, limit: 200 }, { refetchInterval: 3000 });
+  const audit = useAudit(
+    { requestId, limit: 200 },
+    { refetchInterval: 3000 },
+  );
 
   return (
     <>
       <div className="page-header">
-        <h2>Auditoría</h2>
-        <span className="live" role="status">
-          <span className="live-dot" aria-hidden="true" />
-          En vivo
+        <div>
+          <span className="eyebrow">Registro inmutable · solo inserción</span>
+          <h2>Bitácora forense</h2>
+        </div>
+        <div className="ledger-status" role="status">
+          <span className={audit.isError ? "live-dot live-dot--error" : "live-dot"} aria-hidden="true" />
+          <span>
+            {audit.isError ? "Sin sincronizar" : "En vivo / Sincronizado"}
+          </span>
           {audit.dataUpdatedAt > 0 && (
-            <small className="muted">
-              {" "}
-              · actualizado{" "}
-              {new Date(audit.dataUpdatedAt).toLocaleTimeString("es-GT")}
-            </small>
+            <span className="mono">
+              {formatClockTime(audit.dataUpdatedAt)}
+            </span>
           )}
-        </span>
+        </div>
       </div>
 
-      <section className="card">
-        <div className="card-header">
-          <p className="muted">
-            Registro inmutable de transiciones (solo inserción). Se actualiza
-            automáticamente cada pocos segundos.
-          </p>
+      <p className="page-note">
+        Cada transición queda grabada con actor, rol, comentario y timestamp.
+        Las operaciones <span className="mono">UPDATE</span> y{" "}
+        <span className="mono">DELETE</span> están bloqueadas en la base de datos.
+      </p>
+
+      <section className="panel ledger" aria-label="Registro de auditoría">
+        <div className="panel-head">
+          <div>
+            <span className="eyebrow">{audit.data?.length ?? 0} eventos</span>
+            <h3>Ledger de transiciones</h3>
+          </div>
           <label className="inline-field">
-            Solicitud #
+            <span className="eyebrow">Filtrar solicitud</span>
             <input
               type="number"
               min={1}
+              className="mono filter-input"
               placeholder="Todas"
+              aria-label="Filtrar por número de solicitud"
               value={requestIdInput}
               onChange={(event) => setRequestIdInput(event.target.value)}
             />
           </label>
         </div>
 
-        {audit.isLoading && <p role="status">Cargando auditoría…</p>}
+        {audit.isLoading && (
+          <div className="page-state" role="status">
+            <span className="spinner" aria-hidden="true" /> Cargando bitácora…
+          </div>
+        )}
         {audit.isError && (
           <div className="alert alert-error" role="alert">
             {audit.error.message}
           </div>
         )}
         {audit.data && audit.data.length === 0 && (
-          <p className="muted">Sin registros todavía.</p>
+          <div className="empty-state empty-state--inline">
+            <p className="muted">Sin eventos para el filtro seleccionado.</p>
+          </div>
         )}
 
         {audit.data && audit.data.length > 0 && (
           <div className="table-scroll">
-            <table>
+            <table className="table table--dense ledger-table">
               <thead>
                 <tr>
-                  <th>Fecha (ISO 8601)</th>
-                  <th>Solicitud</th>
-                  <th>Usuario / rol</th>
-                  <th>Estado anterior</th>
-                  <th>Estado nuevo</th>
+                  <th>#</th>
+                  <th>Timestamp (ISO 8601)</th>
+                  <th>Transición</th>
+                  <th>Actor · rol</th>
                   <th>Comentario</th>
+                  <th>Integridad</th>
                 </tr>
               </thead>
               <tbody>
                 {audit.data.map((entry) => (
                   <tr key={entry.id}>
-                    <td>
-                      <time className="mono" dateTime={entry.occurredAt}>
-                        {entry.occurredAt}
-                      </time>
-                    </td>
-                    <td>
-                      <Link to={`/requests/${entry.requestId}`}>
+                    <td className="mono">
+                      <Link className="table-link" to={`/requests/${entry.requestId}`}>
                         #{entry.requestId}
                       </Link>
+                      <span className="table-sub mono">evt {entry.id}</span>
                     </td>
                     <td>
-                      {entry.actorName}{" "}
-                      <span
-                        className={`role-badge role-${entry.actorRole.toLowerCase()}`}
-                      >
+                      <time dateTime={entry.occurredAt} title={entry.occurredAt}>
+                        {formatDateTime(entry.occurredAt)}
+                      </time>
+                      <span className="table-sub mono">{entry.occurredAt}</span>
+                    </td>
+                    <td>
+                      <TransitionBadge
+                        fromStatus={entry.fromStatus}
+                        toStatus={entry.toStatus}
+                      />
+                    </td>
+                    <td>
+                      <span className="table-primary">{entry.actorName}</span>
+                      <span className="table-sub mono">{entry.actorId}</span>
+                      <span className={`role-badge role-${entry.actorRole.toLowerCase()}`}>
                         {entry.actorRole}
                       </span>
                     </td>
-                    <td>{entry.fromStatus ?? "—"}</td>
-                    <td>{entry.toStatus}</td>
-                    <td>{entry.comment ?? "—"}</td>
+                    <td className="comment-cell" title={entry.comment ?? ""}>
+                      {entry.comment ?? "—"}
+                    </td>
+                    <td>
+                      <span className="immutable-badge mono">INMUTABLE</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

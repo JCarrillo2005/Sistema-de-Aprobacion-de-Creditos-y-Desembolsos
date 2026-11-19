@@ -9,7 +9,11 @@ export function ProtectedRoute({ roles }: { roles?: Role[] }) {
   const location = useLocation();
 
   if (loading) {
-    return <p className="page-message">Cargando sesión…</p>;
+    return (
+      <div className="page-state" role="status">
+        <span className="spinner" aria-hidden="true" /> Verificando sesión…
+      </div>
+    );
   }
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

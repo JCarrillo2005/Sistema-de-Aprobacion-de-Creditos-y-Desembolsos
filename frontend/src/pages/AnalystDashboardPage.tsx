@@ -1,158 +1,183 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useBudget, useRequests } from "../api/hooks";
-import { REQUEST_STATUSES, type RequestStatus } from "../api/types";
+import { useRequests } from "../api/hooks";
+import type { CreditRequest } from "../api/types";
+import { LifecycleStepper } from "../components/LifecycleStepper";
 import { StatusBadge } from "../components/StatusBadge";
-import { formatDateTime, formatMoney } from "../lib/format";
+import { formatDateTime, formatMoney, formatPercent, formatRelativeAge } from "../lib/format";
+import { debtRatioPercent } from "../lib/rules";
 
-type Filter = RequestStatus | "ALL";
+type Filter = "ALL" | "CREADA" | "EN_REVISION" | "RESUELTAS";
+
+interface FilterOption {
+  key: Filter;
+  label: string;
+}
+
+const FILTERS: readonly FilterOption[] = [
+  { key: "ALL", label: "Todas" },
+  { key: "CREADA", label: "Creadas" },
+  { key: "EN_REVISION", label: "En revisión" },
+  { key: "RESUELTAS", label: "Resueltas" },
+];
+
+function isResolved(item: CreditRequest): boolean {
+  return item.status === "APROBADA" || item.status === "RECHAZADA";
+}
+
+function matches(item: CreditRequest, filter: Filter): boolean {
+  if (filter === "ALL") {
+    return true;
+  }
+  if (filter === "RESUELTAS") {
+    return isResolved(item);
+  }
+  return item.status === filter;
+}
 
 export default function AnalystDashboardPage() {
-  const budgetQuery = useBudget(5000);
   const requestsQuery = useRequests({ refetchInterval: 5000 });
   const [filter, setFilter] = useState<Filter>("ALL");
-
   const all = requestsQuery.data;
 
   const counts = useMemo(() => {
-    const base: Record<RequestStatus, number> = {
+    const result: Record<Filter, number> = {
+      ALL: all?.length ?? 0,
       CREADA: 0,
       EN_REVISION: 0,
-      APROBADA: 0,
-      RECHAZADA: 0,
+      RESUELTAS: 0,
     };
     for (const item of all ?? []) {
-      base[item.status] += 1;
+      if (item.status === "CREADA" || item.status === "EN_REVISION") {
+        result[item.status] += 1;
+      } else {
+        result.RESUELTAS += 1;
+      }
     }
-    return base;
+    return result;
   }, [all]);
 
   const visible = useMemo(
-    () =>
-      (all ?? []).filter((item) => filter === "ALL" || item.status === filter),
+    () => (all ?? []).filter((item) => matches(item, filter)),
     [all, filter],
   );
-
-  const budget = budgetQuery.data;
-  const used = budget ? budget.initial - budget.available : 0;
-  const usedPercent =
-    budget && budget.initial > 0 ? (used / budget.initial) * 100 : 0;
 
   return (
     <>
       <div className="page-header">
-        <h2>Panel de analista</h2>
+        <div>
+          <span className="eyebrow">Analista · bandeja operativa</span>
+          <h2>Bandeja de revisión</h2>
+        </div>
+        <span className="sync-tag mono">ACTUALIZACIÓN 5s</span>
       </div>
 
-      <section className="card" aria-label="Presupuesto global">
-        <h3>Presupuesto global disponible</h3>
-        {budgetQuery.isLoading && <p role="status">Cargando presupuesto…</p>}
-        {budgetQuery.isError && (
-          <div className="alert alert-error" role="alert">
-            {budgetQuery.error.message}
-          </div>
-        )}
-        {budget && (
-          <>
-            <p className="budget-amount">{formatMoney(budget.available)}</p>
-            <div
-              className="progress"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(usedPercent)}
-              aria-label="Presupuesto utilizado"
-            >
-              <div
-                className="progress-bar"
-                style={{ width: `${usedPercent}%` }}
-              />
-            </div>
-            <p className="muted">
-              Comprometido {formatMoney(used)} de {formatMoney(budget.initial)}{" "}
-              ({usedPercent.toFixed(1)} %)
-            </p>
-          </>
-        )}
-      </section>
-
-      <section className="stats" aria-label="Resumen por estado">
-        {REQUEST_STATUSES.map((status) => (
+      <div className="filter-bar" role="group" aria-label="Filtros por estado">
+        {FILTERS.map((option) => (
           <button
-            key={status}
+            key={option.key}
             type="button"
-            className={filter === status ? "stat stat-active" : "stat"}
-            onClick={() =>
-              setFilter((current) => (current === status ? "ALL" : status))
-            }
+            className={filter === option.key ? "filter-btn active" : "filter-btn"}
+            aria-pressed={filter === option.key}
+            onClick={() => setFilter(option.key)}
           >
-            <StatusBadge status={status} />
-            <strong>{counts[status]}</strong>
+            <span>{option.label}</span>
+            <span className="filter-count mono">{counts[option.key]}</span>
           </button>
         ))}
-      </section>
+      </div>
 
-      <section className="card" aria-label="Solicitudes">
-        <div className="card-header">
-          <h3>Solicitudes</h3>
-          <label className="inline-field">
-            Estado
-            <select
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as Filter)}
-            >
-              <option value="ALL">Todos</option>
-              {REQUEST_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </label>
+      <p className="page-note">
+        Riesgo de Endeudamiento = monto solicitado ÷ ingreso mensual declarado.
+        El límite normativo es 40 %.
+      </p>
+
+      {requestsQuery.isLoading && (
+        <div className="page-state" role="status">
+          <span className="spinner" aria-hidden="true" /> Cargando bandeja…
+        </div>
+      )}
+      {requestsQuery.isError && (
+        <div className="alert alert-error" role="alert">
+          {requestsQuery.error.message}
+        </div>
+      )}
+
+      <section className="panel" aria-label="Solicitudes">
+        <div className="panel-head">
+          <div>
+            <span className="eyebrow">{visible.length} en vista</span>
+            <h3>Solicitudes</h3>
+          </div>
         </div>
 
-        {requestsQuery.isLoading && <p role="status">Cargando solicitudes…</p>}
-        {requestsQuery.isError && (
-          <div className="alert alert-error" role="alert">
-            {requestsQuery.error.message}
-          </div>
-        )}
         {all && visible.length === 0 && (
-          <p className="muted">No hay solicitudes para mostrar.</p>
+          <div className="empty-state empty-state--inline">
+            <p className="muted">No hay solicitudes en este estado.</p>
+          </div>
         )}
 
         {visible.length > 0 && (
           <div className="table-scroll">
-            <table>
+            <table className="table table--dense">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>Solicitante</th>
                   <th>Documento</th>
                   <th className="num">Monto</th>
+                  <th className="num">% Deuda</th>
                   <th className="num">Plazo</th>
                   <th>Estado</th>
-                  <th>Creada</th>
+                  <th>Ciclo</th>
+                  <th>Antigüedad</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {visible.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.id}</td>
-                    <td>{item.applicantName}</td>
-                    <td>{item.documentId}</td>
-                    <td className="num">{formatMoney(item.amount)}</td>
-                    <td className="num">{item.termMonths} m</td>
-                    <td>
-                      <StatusBadge status={item.status} />
-                    </td>
-                    <td>{formatDateTime(item.createdAt)}</td>
-                    <td>
-                      <Link to={`/requests/${item.id}`}>Revisar</Link>
-                    </td>
-                  </tr>
-                ))}
+                {visible.map((item) => {
+                  const ratio = debtRatioPercent(item.amount, item.monthlyIncome);
+                  return (
+                    <tr key={item.id}>
+                      <td className="mono">#{item.id}</td>
+                      <td>
+                        <strong className="table-primary">{item.applicantName}</strong>
+                        <span className="table-sub mono">
+                          ingreso {formatMoney(item.monthlyIncome)}
+                        </span>
+                      </td>
+                      <td className="mono">{item.documentId}</td>
+                      <td className="num mono">{formatMoney(item.amount)}</td>
+                      <td className="num">
+                        {ratio !== null && (
+                          <span className={`ratio-cell mono${ratio > 36 ? " ratio-cell--warn" : ""}`}>
+                            {formatPercent(ratio)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="num mono">{item.termMonths} m</td>
+                      <td>
+                        <StatusBadge status={item.status} />
+                      </td>
+                      <td>
+                        <LifecycleStepper status={item.status} compact />
+                      </td>
+                      <td>
+                        <time className="mono" dateTime={item.createdAt} title={item.createdAt}>
+                          {formatRelativeAge(item.createdAt)}
+                        </time>
+                        <span className="table-sub mono">
+                          {formatDateTime(item.createdAt)}
+                        </span>
+                      </td>
+                      <td>
+                        <Link className="table-link" to={`/requests/${item.id}`}>
+                          Revisar →
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

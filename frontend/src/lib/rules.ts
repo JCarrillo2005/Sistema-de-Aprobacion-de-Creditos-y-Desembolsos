@@ -23,6 +23,35 @@ export function maxAllowedAmount(monthlyIncome: number): number {
   return Math.round(monthlyIncome * MAX_DEBT_RATIO * 100) / 100;
 }
 
+// Porcentaje del ingreso mensual que representa el monto solicitado.
+// Se usa tanto en el simulador como en la bandeja del analista para no duplicar la regla.
+export function debtRatioPercent(
+  amount: number,
+  monthlyIncome: number,
+): number | null {
+  if (
+    !Number.isFinite(amount) ||
+    !Number.isFinite(monthlyIncome) ||
+    monthlyIncome <= 0
+  ) {
+    return null;
+  }
+  return Math.round((amount / monthlyIncome) * 10_000) / 100;
+}
+
+// Cuánto del límite permitido (40 % del ingreso) está usando la solicitud.
+// 100 % significa que alcanza exactamente el umbral; > 100 % lo excede.
+export function capacityUsedPercent(
+  amount: number,
+  monthlyIncome: number,
+): number | null {
+  const max = maxAllowedAmount(monthlyIncome);
+  if (!Number.isFinite(amount) || max <= 0) {
+    return null;
+  }
+  return Math.round((amount / max) * 10_000) / 100;
+}
+
 export function parseNumber(raw: string): number | null {
   const trimmed = raw.trim();
   if (trimmed === "") {
