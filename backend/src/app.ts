@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { config } from "./config";
 import { errorHandler, notFoundHandler } from "./http/errorHandler";
+import { requestLogger } from "./http/requestLogger";
 import { auditRouter } from "./modules/audit/audit.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { budgetRouter } from "./modules/budget/budget.routes";
@@ -14,6 +15,7 @@ export function createApp(): express.Express {
   app.disable("x-powered-by");
   app.use(cors({ origin: config.corsOrigins }));
   app.use(express.json({ limit: "100kb" }));
+  app.use(requestLogger());
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });

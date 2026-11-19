@@ -1,5 +1,8 @@
 import { ErrorRequestHandler, RequestHandler } from "express";
+import { config } from "../config";
 import { AppError } from "../domain/errors";
+import { errorSink } from "./logger";
+import { requestIdOf } from "./requestLogger";
 
 export const notFoundHandler: RequestHandler = (_req, res) => {
   res
@@ -38,7 +41,11 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
-  console.error(error);
+  const message = error instanceof Error ? error.message : String(error);
+  errorSink(`[error] id=${requestIdOf(res)} code=INTERNAL_ERROR ${message}`);
+  if (config.env === "development" && error instanceof Error && error.stack) {
+    errorSink(error.stack);
+  }
   res.status(500).json({
     error: { code: "INTERNAL_ERROR", message: "Error interno del servidor" },
   });

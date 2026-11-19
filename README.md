@@ -187,6 +187,16 @@ curl -s -X POST localhost:3000/api/auth/login \
 - **Healthchecks:** PostgreSQL y backend tienen healthcheck; el frontend espera
   a que el backend esté saludable antes de arrancar.
 
+### Observabilidad
+
+- Cada petición genera un `X-Request-Id` y una línea de log con método, ruta,
+  código de estado y duración. Los errores 500 incluyen el mismo id para
+  correlacionar el reporte del frontend con el log del backend.
+- Se omiten `/health` (healthcheck) y `/internal/*` (su URL puede contener el
+  documento). Nunca se registran cuerpos, tokens ni datos personales.
+- En `NODE_ENV=test` la salida se silencia; las pruebas del middleware inyectan
+  su propio colector.
+
 ### Concurrencia e idempotencia
 
 - Aprobar/rechazar corre en **una transacción** con `SELECT ... FOR UPDATE`
