@@ -43,7 +43,21 @@ credit-app/
 │   │   ├── http/                       # middlewares: auth, validate, errorHandler, asyncHandler
 │   │   └── modules/                    # auth, requests, audit, budget, bureau
 │   └── tests/                          # domain, bureau.client, credit.integration
-└── frontend/                           # (Fase 2)
+└── frontend/
+    ├── Dockerfile
+    ├── nginx.conf                      # SPA + proxy /api; bloquea /internal
+    ├── index.html
+    ├── package.json
+    ├── tsconfig.json
+    ├── vite.config.ts
+    └── src/
+        ├── main.tsx, App.tsx, styles.css
+        ├── api/                        # types, client, endpoints, hooks
+        ├── auth/                       # AuthContext, ProtectedRoute
+        ├── lib/                        # rules, amortization, format, routes
+        ├── components/                 # Layout, StatusBadge, AmortizationTable, BureauPanel
+        └── pages/                      # Login, MyRequests, NewRequest, RequestDetail,
+                                        # AnalystDashboard, Audit
 ```
 
 Separación de responsabilidades:
@@ -53,6 +67,11 @@ Separación de responsabilidades:
 - **`modules/*/*.routes.ts`**: solo HTTP (parseo, llamada al servicio, respuesta).
 - **`modules/*/*.service.ts`**: casos de uso y SQL. Toda transacción vive aquí.
 - **`http/`**: preocupaciones transversales (autenticación, errores, validación).
+- **`frontend/src/api/`**: tipos de la API y hooks de TanStack Query; el cliente HTTP es el único que
+  conoce el token.
+- **`frontend/src/lib/`**: reglas y amortización que replican el backend para dar feedback inmediato,
+  más formato y rutas.
+- **`frontend/src/pages/`**: vistas por ruta; la lógica de negocio real permanece en el backend.
 
 ## 4. Comandos
 
@@ -68,7 +87,14 @@ npm run typecheck    # tsc --noEmit, debe pasar sin errores
 npm test             # requiere la base credit_test arriba
 npm run build
 
-# Todo en contenedores
+# Frontend
+cd frontend
+npm install
+npm run dev          # UI en http://localhost:5173 (proxy /api -> localhost:3000)
+npm run typecheck
+npm run build
+
+# Todo en contenedores (un solo origen en http://localhost:8080)
 docker compose up --build
 ```
 
@@ -130,7 +156,7 @@ Si `credit_test` no existe porque el volumen de Postgres es anterior a `db/init`
   409 conflicto (historial / transición inválida), 422 presupuesto insuficiente, 503 buró no disponible.
 - Los cambios de esquema se hacen en `db/schema.ts` de forma idempotente (`IF NOT EXISTS`, `ON CONFLICT`).
 
-### Frontend (Fase 2)
+### Frontend
 
 - Estado de servidor con TanStack Query; no duplicarlo en estado local.
 - Formularios con validación en vivo reutilizando las mismas reglas que el backend.
@@ -156,12 +182,16 @@ Reglas para tocar pruebas:
 - Toda regla de negocio nueva o modificada necesita su prueba.
 - Las pruebas de integración usan `TRUNCATE` y **solo** deben apuntar a `credit_test`, nunca a `credit`.
 - No usar `setTimeout` reales largos en pruebas: parametrizar los tiempos (`baseDelayMs`).
-- Antes de dar una tarea por terminada: `npm run typecheck && npm test`.
+- Antes de dar una tarea por terminada: `npm run typecheck && npm test` en backend y, si se tocó el
+  frontend, `npm run typecheck && npm run build` en `frontend/`.
+- El frontend no tiene pruebas automatizadas; su lógica crítica de negocio está cubierta por las
+  pruebas del backend.
 
 ## 8.1 Definición de "terminado"
 
-- [ ] `npm run typecheck` sin errores.
+- [ ] `npm run typecheck` sin errores en backend.
 - [ ] `npm test` en verde.
+- [ ] Si se tocó el frontend: `npm run typecheck && npm run build` en `frontend/`.
 - [ ] Las reglas nuevas se validan en frontend **y** backend.
 - [ ] Ninguna ruta nueva carece de `authenticate`/`requireRole` cuando corresponde.
 - [ ] `docker compose up --build` levanta todo desde cero.
@@ -189,6 +219,8 @@ Reglas para tocar pruebas:
 | `BUREAU_MIN_DELAY_MS` / `BUREAU_MAX_DELAY_MS` | `2000` / `4000`                                  | Latencia artificial                                    |
 | `BUREAU_FAILURE_RATE`                         | `0.3`                                            | Probabilidad de respuesta 503                          |
 | `TEST_DATABASE_URL`                           | `.../credit_test`                                | Base usada por las pruebas                             |
+| `DB_PORT`                                     | `5432`                                           | Puerto publicado de PostgreSQL en Compose (host)       |
+| `VITE_PROXY_TARGET`                           | `http://localhost:3000`                          | Backend al que Vite proxea `/api` en desarrollo        |
 
 ## 11. Decisiones de diseño relevantes
 
