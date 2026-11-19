@@ -1,5 +1,7 @@
 # Sistema de Aprobación de Créditos y Desembolsos
 
+[![CI](https://github.com/JCarrillo2005/Sistema-de-Aprobacion-de-Creditos-y-Desembolsos/actions/workflows/ci.yml/badge.svg)](https://github.com/JCarrillo2005/Sistema-de-Aprobacion-de-Creditos-y-Desembolsos/actions/workflows/ci.yml)
+
 Aplicación Full-Stack para gestionar solicitudes internas de crédito: registro
 con reglas de negocio estrictas, consulta a un buró crediticio simulado
 (resiliente), flujo de aprobación con presupuesto global concurrente-seguro y
@@ -257,6 +259,18 @@ cd frontend
 npm run typecheck
 npm run build
 ```
+
+## Integración continua
+
+Cada push a `main` (y cada pull request) ejecuta `.github/workflows/ci.yml`:
+
+- **Backend · typecheck + tests**: levanta PostgreSQL 16, aplica el esquema y
+  corre las 16 pruebas con reporte *verbose* (se ve el nombre de cada prueba).
+- **Frontend · typecheck + build**: valida tipos y genera el bundle de producción.
+
+Para ver los resultados: pestaña **Actions** del repositorio → flujo **CI** →
+última ejecución → job deseado → paso **Pruebas (Vitest + Supertest)**. El badge
+del inicio de este README muestra el estado de la última ejecución en `main`.
 
 ## Estructura
 
