@@ -49,8 +49,16 @@ export function LifecycleStepper({ status, compact = false }: Props) {
           index < current ? "done" : index === current ? "current" : "pending";
         return (
           <li key={label} className={`lifecycle-step lifecycle-step--${state}`}>
-            <span className="lifecycle-marker" aria-hidden="true">
-              {index < current ? "✓" : `0${index + 1}`}
+            <span className="lifecycle-node">
+              <span className="lifecycle-marker" aria-hidden="true">
+                {index < current ? "✓" : `0${index + 1}`}
+              </span>
+              {index < labels.length - 1 && (
+                <span
+                  className={`lifecycle-connector${index < current ? " lifecycle-connector--done" : ""}`}
+                  aria-hidden="true"
+                />
+              )}
             </span>
             <span className="lifecycle-copy">
               <span className="lifecycle-label">{label}</span>
@@ -58,9 +66,6 @@ export function LifecycleStepper({ status, compact = false }: Props) {
                 {index < current ? "completado" : index === current ? "estado actual" : "pendiente"}
               </span>
             </span>
-            {index < labels.length - 1 && (
-              <span className="lifecycle-connector" aria-hidden="true" />
-            )}
           </li>
         );
       })}

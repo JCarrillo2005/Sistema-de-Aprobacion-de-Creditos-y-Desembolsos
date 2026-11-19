@@ -80,9 +80,7 @@ export function AmortizationTable({ principal, termMonths }: Props) {
         </div>
       </details>
 
-      <p className="fineprint">
-        Estimación informativa con la misma tasa y sistema que aplica el servidor.
-      </p>
+      <p className="fineprint mono">Estimación · tasa y sistema del servidor.</p>
     </section>
   );
 }

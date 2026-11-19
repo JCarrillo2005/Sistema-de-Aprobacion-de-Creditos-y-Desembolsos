@@ -58,10 +58,7 @@ export default function LoginPage() {
             <dd className="mono">Solo inserción · inmutable</dd>
           </div>
         </dl>
-        <p className="fineprint">
-          Selector de usuarios sembrados. En producción se sustituiría por
-          credenciales reales o SSO.
-        </p>
+        <p className="fineprint mono">Selector demo · sin credenciales.</p>
       </section>
 
       <main className="login-main">

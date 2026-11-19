@@ -150,19 +150,13 @@ function ReviewActions({ request }: { request: CreditRequest }) {
       {isFinal && (
         <div className="decision-final">
           <StatusBadge status={request.status} />
-          <p>
-            Estado final. La transición quedó registrada y no admite
-            reversiones.
-          </p>
+          <p>Estado final · sin reversiones.</p>
         </div>
       )}
 
       {request.status === "CREADA" && (
         <>
-          <p className="decision-copy">
-            La solicitud está sin tomar. Al iniciar la revisión se registra la
-            transición <span className="mono">CREADA → EN_REVISION</span>.
-          </p>
+          <p className="decision-copy">Sin tomar.</p>
           <button
             type="button"
             className="btn btn-primary btn-block"
@@ -204,7 +198,6 @@ function ReviewActions({ request }: { request: CreditRequest }) {
                 Solicitado <span className="mono">{formatMoney(request.amount)}</span>{" "}
                 · disponible{" "}
                 <span className="mono">{formatMoney(budget.data.available)}</span>.
-                La aprobación fallará y la solicitud permanecerá en revisión.
               </p>
             </div>
           )}
@@ -246,7 +239,7 @@ function ReviewActions({ request }: { request: CreditRequest }) {
                 maxLength={500}
                 value={reason}
                 aria-describedby="reject-counter"
-                placeholder="Explica el motivo con claridad: quedará en la bitácora y será visible para el solicitante."
+                placeholder="Queda registrado en la bitácora."
                 onChange={(event) => setReason(event.target.value)}
               />
               <div className="counter-row">

@@ -64,7 +64,9 @@ src/
 
 La interfaz sigue una estética _Modern Institutional Ledger_: fondos neutros,
 bordes de 1 px, sin sombras decorativas y sin dependencias de UI externas
-(todo se resuelve en `styles.css` con tokens CSS). Los montos, tasas, plazos,
+(todo se resuelve en `styles.css` con tokens CSS). El azul marino se reserva
+para marca, navegación activa, encabezados de sección y botón primario.
+Los montos, tasas, plazos,
 documentos y timestamps usan siempre tipografía monoespaciada con
 `font-variant-numeric: tabular-nums`.
 

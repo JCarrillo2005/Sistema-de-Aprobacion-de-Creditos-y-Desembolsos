@@ -18,6 +18,8 @@
   --accent: #1d4ed8;
   --accent-soft: #eff6ff;
   --focus: #93c5fd;
+  --navy: #16324f;
+  --navy-hover: #22466b;
 
   --creada-fg: #475569;
   --creada-bg: #f1f5f9;
@@ -207,6 +209,7 @@ code {
 }
 .sidebar-brand strong {
   display: block;
+  color: var(--navy);
   font-size: 0.95rem;
   letter-spacing: -0.02em;
 }
@@ -242,15 +245,15 @@ code {
 }
 .side-nav-link.active {
   background: var(--surface-2);
-  color: var(--ink);
-  box-shadow: inset 2px 0 0 var(--ink);
+  color: var(--navy);
+  box-shadow: inset 2px 0 0 var(--navy);
 }
 .side-nav-index {
   color: var(--faint);
   font-size: 0.68rem;
 }
 .side-nav-link.active .side-nav-index {
-  color: var(--ink);
+  color: var(--navy);
 }
 
 .sidebar-bottom {
@@ -505,7 +508,7 @@ code {
   margin-top: 3px;
 }
 .page-header .eyebrow {
-  color: var(--faint);
+  color: var(--navy);
 }
 .page-note {
   margin-top: -6px;
@@ -685,13 +688,13 @@ code {
   cursor: not-allowed;
 }
 .btn-primary {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--navy);
+  border-color: var(--navy);
   color: #ffffff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--ink-soft);
-  border-color: var(--ink-soft);
+  background: var(--navy-hover);
+  border-color: var(--navy-hover);
 }
 .btn-danger {
   background: var(--rechazada-fg);
@@ -804,7 +807,7 @@ input[type="number"] {
 .form-section legend {
   padding: 0;
   margin-bottom: 14px;
-  color: var(--muted);
+  color: var(--navy);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -1053,11 +1056,14 @@ input[type="number"] {
 }
 .lifecycle-step {
   position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.lifecycle-node {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding-right: 14px;
 }
 .lifecycle-marker {
   display: grid;
@@ -1093,6 +1099,7 @@ input[type="number"] {
 .lifecycle-copy {
   display: grid;
   min-width: 0;
+  padding-right: 10px;
 }
 .lifecycle-label {
   font-size: 0.8rem;
@@ -1106,10 +1113,13 @@ input[type="number"] {
 .lifecycle-connector {
   position: absolute;
   top: 13px;
+  left: 26px;
   right: 0;
-  width: 14px;
   height: 1px;
   background: var(--border-strong);
+}
+.lifecycle-connector--done {
+  background: var(--navy);
 }
 .lifecycle-compact {
   display: inline-flex;
@@ -1599,7 +1609,7 @@ input[type="number"] {
   background: var(--surface-2);
 }
 .filter-btn.active {
-  background: var(--ink);
+  background: var(--navy);
   color: #ffffff;
 }
 .filter-count {
@@ -1789,7 +1799,7 @@ input[type="number"] {
   }
   .side-nav-link.active {
     box-shadow: none;
-    border-bottom-color: var(--ink);
+    border-bottom-color: var(--navy);
   }
   .sidebar-bottom {
     display: flex;
@@ -1843,17 +1853,19 @@ input[type="number"] {
   }
   .lifecycle-step {
     gap: 6px;
-    padding-right: 6px;
   }
   .lifecycle-marker {
     width: 22px;
     height: 22px;
   }
+  .lifecycle-copy {
+    padding-right: 6px;
+  }
   .lifecycle-caption {
     display: none;
   }
   .lifecycle-connector {
-    width: 6px;
+    left: 22px;
     top: 11px;
   }
   .page-header {
