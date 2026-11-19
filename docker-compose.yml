@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: credit-db
+    environment:
+      POSTGRES_USER: credit
+      POSTGRES_PASSWORD: credit
+      POSTGRES_DB: credit
+    ports:
+      # DB_PORT permite usar otro puerto local si 5432 está ocupado.
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # En un volumen nuevo crea la base credit_test para las pruebas.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U credit -d credit"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  backend:
+    build: ./backend
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgres://credit:credit@db:5432/credit
+      JWT_SECRET: ${JWT_SECRET:-cambia-este-secreto-en-produccion}
+      BUREAU_BASE_URL: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  # frontend: se agrega en la Fase 2
+
+volumes:
+  pgdata:

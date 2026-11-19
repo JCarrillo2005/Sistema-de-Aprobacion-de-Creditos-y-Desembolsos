@@ -1,0 +1,108 @@
+# ============================================
+# Node.js
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm/
+.yarn/
+.pnp.*
+.pnp.js
+
+# Build / cache
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+.tsbuildinfo
+*.tsbuildinfo
+
+# ============================================
+# Entorno / Secretos  (NUNCA subir al repo)
+# ============================================
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+secrets/
+config.json
+
+# ============================================
+# React (Vite / CRA)
+# ============================================
+.vite/
+storybook-static/
+coverage/
+.nyc_output/
+
+# ============================================
+# Base de datos / PostgreSQL
+# ============================================
+pgdata/
+postgres-data/
+*.sql.gz
+*.dump
+*.sqlite
+*.sqlite3
+*.db
+
+# ============================================
+# Docker
+# ============================================
+# Ignorar solo lo generado, los Dockerfile y
+# docker-compose.yml SI deben versionarse
+docker-compose.override.yml
+docker-data/
+.docker/
+*.tar
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+pids/
+*.pid
+*.seed
+
+# ============================================
+# Testing
+# ============================================
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+
+# ============================================
+# Editor / SO
+# ============================================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================
+# Misc
+# ============================================
+.tmp/
+temp/
+tmp/
+
+# Notas locales de trabajo (no forman parte de la entrega)
+claude.txt
