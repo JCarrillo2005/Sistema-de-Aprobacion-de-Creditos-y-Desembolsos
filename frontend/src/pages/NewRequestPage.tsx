@@ -7,9 +7,9 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
-import { useBureauCheck, useCreateRequest } from "../api/hooks";
+import { useBureauCheck, useCreateRequest, useDocumentStatus } from "../api/hooks";
 import { AmortizationTable } from "../components/AmortizationTable";
-import { formatMoney, formatPercent } from "../lib/format";
+import { formatDateTime, formatMoney, formatPercent } from "../lib/format";
 import {
   ALLOWED_TERMS,
   capacityUsedPercent,
@@ -30,7 +30,7 @@ const EMPTY_FORM: RequestFormValues = {
 };
 
 interface FieldStatus {
-  tone: "ok" | "error";
+  tone: "ok" | "error" | "info";
   text: string;
 }
 
@@ -93,7 +93,7 @@ function TextField({
           className={`field-status field-status--${status.tone}`}
           aria-live="polite"
         >
-          {`${status.tone === "ok" ? "✓" : "!"} ${status.text}`}
+          {`${status.tone === "ok" ? "✓" : status.tone === "error" ? "!" : "…"} ${status.text}`}
         </small>
       )}
     </div>
@@ -109,6 +109,29 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   }, [value, delayMs]);
 
   return debounced;
+}
+
+// Solo dígitos y separadores; recorta a 2 decimales mientras se escribe.
+// Acepta coma decimal ("1,5" → "1.5") y coma de miles ("1,000" → "1000"),
+// igual que el formato en-US que usa la interfaz.
+function sanitizeMoneyInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.,]/g, "");
+  const hasDot = cleaned.includes(".");
+  const hasComma = cleaned.includes(",");
+  let normalized: string;
+  if (hasComma && hasDot) {
+    normalized = cleaned.replace(/,/g, "");
+  } else if (/^\d{1,3}(,\d{3})+$/.test(cleaned)) {
+    normalized = cleaned.replace(/,/g, "");
+  } else {
+    normalized = cleaned.replace(/,/g, ".");
+  }
+  const [integerPart = "", ...decimalParts] = normalized.split(".");
+  if (!normalized.includes(".")) {
+    return integerPart;
+  }
+  const decimals = decimalParts.join("").slice(0, 2);
+  return `${integerPart}.${decimals}`;
 }
 
 interface CapacityMeterProps {
@@ -185,9 +208,11 @@ export default function NewRequestPage() {
     [values],
   );
 
-  const debouncedDocument = useDebouncedValue(values.documentId, 250);
-  const documentStatus = useMemo<FieldStatus | null>(() => {
-    if (debouncedDocument.trim().length === 0) {
+  const debouncedDocument = useDebouncedValue(values.documentId.trim(), 300);
+
+  // 1) Validación de formato (mismas reglas que el backend).
+  const formatStatus = useMemo<FieldStatus | null>(() => {
+    if (debouncedDocument.length === 0) {
       return null;
     }
     // Se reutiliza la misma validación del formulario: no se duplica ninguna regla.
@@ -200,9 +225,40 @@ export default function NewRequestPage() {
     }
     return {
       tone: "ok",
-      text: `Formato válido · se registrará como ${debouncedDocument.trim().toUpperCase()}`,
+      text: `Formato válido · se registrará como ${debouncedDocument.toUpperCase()}`,
     };
   }, [debouncedDocument, values]);
+
+  // 2) Detección en el servidor: solicitud pendiente o rechazo dentro de 30 días.
+  const documentFormatValid = formatStatus?.tone === "ok";
+  const documentCheck = useDocumentStatus(debouncedDocument, documentFormatValid);
+  const documentBlocked = documentCheck.data?.blocked === true;
+
+  const documentDisplayStatus = useMemo<FieldStatus | null>(() => {
+    if (formatStatus?.tone === "error") {
+      return formatStatus;
+    }
+    if (documentFormatValid && documentCheck.isFetching && !documentCheck.data) {
+      return { tone: "info", text: "Verificando historial del documento…" };
+    }
+    // Si está bloqueado, el detalle se muestra solo en el recuadro amarillo
+    // que va debajo del campo; así no se duplica el mensaje.
+    if (documentCheck.data?.blocked) {
+      return null;
+    }
+    if (documentCheck.data) {
+      return {
+        tone: "ok",
+        text: "Sin solicitudes pendientes ni rechazos en los últimos 30 días",
+      };
+    }
+    return formatStatus;
+  }, [
+    formatStatus,
+    documentFormatValid,
+    documentCheck.isFetching,
+    documentCheck.data,
+  ]);
 
   const incomeNumber = parseNumber(values.monthlyIncome);
   const amountNumber = parseNumber(values.amount);
@@ -226,7 +282,11 @@ export default function NewRequestPage() {
 
   function update(field: RequestFormField, value: string) {
     // El backend ya normaliza el documento; hacerlo aquí evita sorpresas al guardar.
-    const nextValue = field === "documentId" ? value.toUpperCase() : value;
+    let nextValue = field === "documentId" ? value.toUpperCase() : value;
+    // El dinero se limita a 2 decimales directamente en la entrada.
+    if (field === "monthlyIncome" || field === "amount") {
+      nextValue = sanitizeMoneyInput(nextValue);
+    }
     setValues((previous) => ({ ...previous, [field]: nextValue }));
     if (createRequest.isError) {
       createRequest.reset();
@@ -240,7 +300,7 @@ export default function NewRequestPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitAttempted(true);
-    if (!valid || createRequest.isPending) {
+    if (!valid || createRequest.isPending || documentBlocked) {
       return;
     }
     createRequest.mutate(valid, {
@@ -289,12 +349,36 @@ export default function NewRequestPage() {
               value={values.documentId}
               error={visibleError("documentId")}
               status={
-                visibleError("documentId") ? undefined : (documentStatus ?? undefined)
+                visibleError("documentId")
+                  ? undefined
+                  : (documentDisplayStatus ?? undefined)
               }
               onChange={(value) => update("documentId", value)}
               onBlur={() => markTouched("documentId")}
               inputProps={{ maxLength: 20, placeholder: "Ej. DPI-1234567", spellCheck: false }}
             />
+            {documentBlocked && documentCheck.data?.message && (
+              <div className="alert alert-warning alert-contained" role="alert">
+                <div className="alert-title">
+                  <strong>
+                    {documentCheck.data.blockingStatus === "RECHAZADA"
+                      ? "Documento con rechazo reciente"
+                      : "Documento con solicitud pendiente"}
+                  </strong>
+                  <code className="mono">
+                    Solicitud #{documentCheck.data.blockingRequestId ?? "—"} ·{" "}
+                    {documentCheck.data.blockingStatus ?? "PENDIENTE"}
+                  </code>
+                </div>
+                <p>{documentCheck.data.message}</p>
+                {documentCheck.data.blockedUntil && (
+                  <p className="alert-footnote">
+                    Podrá volver a solicitar a partir de{" "}
+                    {formatDateTime(documentCheck.data.blockedUntil)}.
+                  </p>
+                )}
+              </div>
+            )}
           </fieldset>
 
           <fieldset className="form-section">
@@ -308,11 +392,11 @@ export default function NewRequestPage() {
               onChange={(value) => update("monthlyIncome", value)}
               onBlur={() => markTouched("monthlyIncome")}
               inputProps={{
-                type: "number",
-                min: 0,
-                step: "0.01",
+                type: "text",
                 inputMode: "decimal",
                 placeholder: "0.00",
+                autoComplete: "off",
+                className: "money-input",
               }}
             />
             <TextField
@@ -324,11 +408,11 @@ export default function NewRequestPage() {
               onChange={(value) => update("amount", value)}
               onBlur={() => markTouched("amount")}
               inputProps={{
-                type: "number",
-                min: 0,
-                step: "0.01",
+                type: "text",
                 inputMode: "decimal",
                 placeholder: "0.00",
+                autoComplete: "off",
+                className: "money-input",
               }}
             />
             <CapacityMeter income={validIncome} amount={positiveAmount} />
@@ -375,7 +459,7 @@ export default function NewRequestPage() {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={!valid || createRequest.isPending}
+              disabled={!valid || createRequest.isPending || documentBlocked}
               aria-busy={createRequest.isPending}
             >
               {createRequest.isPending

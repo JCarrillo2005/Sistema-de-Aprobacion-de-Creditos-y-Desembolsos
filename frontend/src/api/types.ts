@@ -78,3 +78,13 @@ export interface AuditFilters {
   requestId?: number;
   limit?: number;
 }
+
+export interface DocumentStatus {
+  documentId: string;
+  blocked: boolean;
+  blockingRequestId?: number;
+  blockingStatus?: RequestStatus;
+  blockingCreatedAt?: string;
+  message?: string;
+  blockedUntil?: string | null;
+}

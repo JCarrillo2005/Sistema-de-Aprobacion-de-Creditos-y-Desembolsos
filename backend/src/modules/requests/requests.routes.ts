@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   createRequestSchema,
+  documentIdSchema,
   idSchema,
   optionalCommentSchema,
   rejectSchema,
@@ -19,6 +20,7 @@ import {
   TransitionAction,
   applyTransition,
   createRequest,
+  getDocumentStatus,
   getRequestForActor,
   listRequests,
   saveBureauResult,
@@ -66,6 +68,19 @@ requestsRouter.get(
       status as RequestStatus | undefined,
     );
     res.json({ requests });
+  }),
+);
+
+// Consulta previa del formulario: ¿el documento ya tiene una solicitud
+// pendiente o un rechazo dentro de la ventana de 30 días?
+requestsRouter.get(
+  "/document-status",
+  asyncHandler(async (req, res) => {
+    const { documentId } = parseWith(
+      z.object({ documentId: documentIdSchema }),
+      req.query,
+    );
+    res.json(await getDocumentStatus(documentId));
   }),
 );
 

@@ -62,6 +62,25 @@ describe("validación y restricciones de creación", () => {
     expect(res.body.error.code).toBe("VALIDATION_ERROR");
   });
 
+  it("rechaza montos con más de dos decimales", async () => {
+    const solicitante = await login("sol-1");
+    const res = await createRequestAs(solicitante, {
+      amount: 9.99999999999999,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain("2 decimales");
+  });
+
+  it("responde 400 (no 500) cuando el 40% tiene fracciones de centavo", async () => {
+    const solicitante = await login("sol-1");
+    const res = await createRequestAs(solicitante, {
+      monthlyIncome: 999.99,
+      amount: 400,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
   it("bloquea una nueva solicitud si hay una PENDIENTE reciente del mismo documento", async () => {
     const solicitante = await login("sol-1");
     const first = await createRequestAs(solicitante);
@@ -98,6 +117,66 @@ describe("validación y restricciones de creación", () => {
     );
     const allowed = await createRequestAs(solicitante);
     expect(allowed.status).toBe(201);
+  });
+});
+
+describe("consulta previa por documento", () => {
+  it("detecta una solicitud pendiente del mismo documento", async () => {
+    const solicitante = await login("sol-1");
+    const created = await createRequestAs(solicitante);
+    const id = created.body.request.id as number;
+
+    const status = await request(app)
+      .get("/api/requests/document-status")
+      .query({ documentId: "doc-1001" })
+      .set(bearer(solicitante));
+
+    expect(status.status).toBe(200);
+    expect(status.body).toMatchObject({
+      blocked: true,
+      blockingRequestId: id,
+      blockingStatus: "CREADA",
+    });
+    expect(status.body.blockingCreatedAt).toBeTruthy();
+    expect(status.body.message).toContain("PENDIENTE");
+  });
+
+  it("marca el documento disponible cuando el rechazo supera los 30 días", async () => {
+    const solicitante = await login("sol-1");
+    const analista = await login("ana-1");
+    const created = await createRequestAs(solicitante);
+    const id = created.body.request.id as number;
+    await moveToReview(analista, id);
+    await request(app)
+      .post(`/api/requests/${id}/reject`)
+      .set(bearer(analista))
+      .send({ comment: "Historial crediticio insuficiente" })
+      .expect(200);
+
+    const blocked = await request(app)
+      .get("/api/requests/document-status")
+      .query({ documentId: "DOC-1001" })
+      .set(bearer(solicitante));
+    expect(blocked.body.blocked).toBe(true);
+    expect(blocked.body.blockingStatus).toBe("RECHAZADA");
+    expect(blocked.body.blockingCreatedAt).toBeTruthy();
+    expect(blocked.body.blockedUntil).toBeTruthy();
+
+    await pool.query(
+      `UPDATE credit_requests SET created_at = now() - interval '31 days'`,
+    );
+    const free = await request(app)
+      .get("/api/requests/document-status")
+      .query({ documentId: "DOC-1001" })
+      .set(bearer(solicitante));
+    expect(free.body.blocked).toBe(false);
+  });
+
+  it("exige autenticación", async () => {
+    const res = await request(app)
+      .get("/api/requests/document-status")
+      .query({ documentId: "DOC-1001" });
+    expect(res.status).toBe(401);
   });
 });
 

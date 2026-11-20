@@ -7,6 +7,7 @@ import type {
   BureauCheckResponse,
   CreateRequestPayload,
   CreditRequest,
+  DocumentStatus,
   RequestStatus,
   TransitionResult,
 } from "./types";
@@ -32,6 +33,11 @@ export const requestsApi = {
   get: (id: number): Promise<CreditRequest> =>
     request<{ request: CreditRequest }>(`/requests/${id}`).then(
       (res) => res.request,
+    ),
+
+  documentStatus: (documentId: string): Promise<DocumentStatus> =>
+    request<DocumentStatus>(
+      `/requests/document-status?documentId=${encodeURIComponent(documentId)}`,
     ),
 
   create: (payload: CreateRequestPayload): Promise<CreditRequest> =>

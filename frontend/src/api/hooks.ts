@@ -51,6 +51,17 @@ export function useRequest(
   });
 }
 
+// Detección previa del documento: la misma regla que aplica el backend al crear.
+export function useDocumentStatus(documentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["requests", "document-status", documentId] as const,
+    queryFn: () => requestsApi.documentStatus(documentId),
+    enabled,
+    staleTime: 5_000,
+    retry: false,
+  });
+}
+
 export function useBudget(refetchInterval?: number) {
   return useQuery({
     queryKey: keys.budget,

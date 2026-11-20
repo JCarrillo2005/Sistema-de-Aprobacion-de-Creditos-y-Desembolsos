@@ -69,6 +69,99 @@ async function insertAudit(
   );
 }
 
+interface BlockingRow {
+  id: number;
+  status: RequestStatus;
+  created_at: Date;
+}
+
+const BLOCKING_SQL = `
+  SELECT id, status, created_at
+    FROM credit_requests
+   WHERE document_id = $1
+     AND created_at >= now() - ($2::int * interval '1 day')
+     AND status IN ('CREADA', 'EN_REVISION', 'RECHAZADA')
+   ORDER BY created_at DESC
+   LIMIT 1`;
+
+/** Busca una solicitud del documento que bloquee una nueva creación. */
+async function findBlockingRequest(
+  documentId: string,
+  client?: PoolClient,
+): Promise<BlockingRow | undefined> {
+  const params = [documentId, HISTORY_WINDOW_DAYS];
+  const result = client
+    ? await client.query<BlockingRow>(BLOCKING_SQL, params)
+    : await pool.query<BlockingRow>(BLOCKING_SQL, params);
+  return result.rows[0];
+}
+
+interface BlockingInfo {
+  message: string;
+  blockingRequestId: number;
+  blockingStatus: RequestStatus;
+  blockingCreatedAt: string;
+  blockedUntil: string | null;
+}
+
+/** Construye el motivo y las fechas del bloqueo (compartido por 409 y consulta). */
+function describeBlockingRequest(
+  documentId: string,
+  previous: BlockingRow,
+): BlockingInfo {
+  const createdAt = previous.created_at;
+  const availableAgain = new Date(
+    createdAt.getTime() + HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  if (previous.status === "RECHAZADA") {
+    return {
+      message: `El documento ${documentId} tiene la solicitud #${previous.id} en estado RECHAZADA, creada el ${createdAt.toISOString()} (dentro de los últimos ${HISTORY_WINDOW_DAYS} días). Podrá volver a solicitar a partir del ${availableAgain.toISOString()}.`,
+      blockingRequestId: previous.id,
+      blockingStatus: previous.status,
+      blockingCreatedAt: createdAt.toISOString(),
+      blockedUntil: availableAgain.toISOString(),
+    };
+  }
+
+  return {
+    message: `El documento ${documentId} tiene la solicitud #${previous.id} en estado PENDIENTE (${previous.status}), creada el ${createdAt.toISOString()} (dentro de los últimos ${HISTORY_WINDOW_DAYS} días). Debe resolverse antes de crear otra.`,
+    blockingRequestId: previous.id,
+    blockingStatus: previous.status,
+    blockingCreatedAt: createdAt.toISOString(),
+    blockedUntil: null,
+  };
+}
+
+export interface DocumentStatus {
+  documentId: string;
+  blocked: boolean;
+  blockingRequestId?: number;
+  blockingStatus?: RequestStatus;
+  blockingCreatedAt?: string;
+  message?: string;
+  blockedUntil?: string | null;
+}
+
+/**
+ * Consulta previa (no bloqueante) que usa el formulario para avisar si el
+ * documento ya tiene una solicitud pendiente o un rechazo reciente. La regla
+ * real se sigue aplicando dentro de la transacción de creación.
+ */
+export async function getDocumentStatus(
+  documentId: string,
+): Promise<DocumentStatus> {
+  const previous = await findBlockingRequest(documentId);
+  if (!previous) {
+    return { documentId, blocked: false };
+  }
+  return {
+    documentId,
+    blocked: true,
+    ...describeBlockingRequest(documentId, previous),
+  };
+}
+
 export async function createRequest(
   actor: AuthUser,
   input: CreateRequestInput,
@@ -79,34 +172,14 @@ export async function createRequest(
       input.documentId,
     ]);
 
-    const blocking = await client.query<{
-      id: number;
-      status: RequestStatus;
-      created_at: Date;
-    }>(
-      `SELECT id, status, created_at
-         FROM credit_requests
-        WHERE document_id = $1
-          AND created_at >= now() - ($2::int * interval '1 day')
-          AND status IN ('CREADA', 'EN_REVISION', 'RECHAZADA')
-        ORDER BY created_at DESC
-        LIMIT 1`,
-      [input.documentId, HISTORY_WINDOW_DAYS],
-    );
-
-    const previous = blocking.rows[0];
+    const previous = await findBlockingRequest(input.documentId, client);
     if (previous) {
-      const createdAt = previous.created_at;
-      const availableAgain = new Date(
-        createdAt.getTime() + HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-      );
-      const message =
-        previous.status === "RECHAZADA"
-          ? `El documento ${input.documentId} tiene la solicitud #${previous.id} en estado RECHAZADA, creada el ${createdAt.toISOString()} (dentro de los últimos ${HISTORY_WINDOW_DAYS} días). Podrá volver a solicitar a partir del ${availableAgain.toISOString()}.`
-          : `El documento ${input.documentId} tiene la solicitud #${previous.id} en estado PENDIENTE (${previous.status}), creada el ${createdAt.toISOString()} (dentro de los últimos ${HISTORY_WINDOW_DAYS} días). Debe resolverse antes de crear otra.`;
-      throw new AppError(409, "RECENT_HISTORY_BLOCK", message, {
-        blockingRequestId: previous.id,
-        blockingStatus: previous.status,
+      const info = describeBlockingRequest(input.documentId, previous);
+      throw new AppError(409, "RECENT_HISTORY_BLOCK", info.message, {
+        blockingRequestId: info.blockingRequestId,
+        blockingStatus: info.blockingStatus,
+        blockingCreatedAt: info.blockingCreatedAt,
+        blockedUntil: info.blockedUntil,
       });
     }
 

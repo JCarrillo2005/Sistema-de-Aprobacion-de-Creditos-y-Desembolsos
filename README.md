@@ -146,6 +146,7 @@ curl -s -X POST localhost:3000/api/auth/login \
 | GET | `/api/auth/me` | ambos | Usuario autenticado (rol leído de la BD) |
 | POST | `/api/requests` | SOLICITANTE | Crear solicitud |
 | GET | `/api/requests` | ambos | Propias o todas (según rol) |
+| GET | `/api/requests/document-status` | ambos | ¿El documento tiene historial bloqueante? (`?documentId=`) |
 | GET | `/api/requests/:id` | ambos | Detalle |
 | POST | `/api/requests/:id/start-review` | ANALISTA | CREADA → EN_REVISION |
 | POST | `/api/requests/:id/approve` | ANALISTA | EN_REVISION → APROBADA |
@@ -157,7 +158,9 @@ curl -s -X POST localhost:3000/api/auth/login \
 
 ## Reglas de negocio implementadas
 
-1. Monto ≤ 40 % del ingreso mensual (Zod + `CHECK` en PostgreSQL).
+1. Monto ≤ 40 % del ingreso mensual (Zod + `CHECK` en PostgreSQL). El máximo se
+   trunca a centavos para no superar el `CHECK` exacto, y el dinero solo admite
+   2 decimales (la UI los limita al escribir y el backend rechaza el resto).
 2. Bloqueo si el mismo documento tiene una solicitud `CREADA`, `EN_REVISION` o
    `RECHAZADA` en los últimos 30 días (HTTP 409 con el motivo exacto).
 3. La creación se serializa por documento con `pg_advisory_xact_lock`, así dos
@@ -275,7 +278,7 @@ npm run build
 Cada push a `main` (y cada pull request) ejecuta `.github/workflows/ci.yml`:
 
 - **Backend · typecheck + tests**: levanta PostgreSQL 16, aplica el esquema y
-  corre las 16 pruebas con reporte *verbose* (se ve el nombre de cada prueba).
+  corre las 26 pruebas con reporte *verbose* (se ve el nombre de cada prueba).
 - **Frontend · typecheck + build**: valida tipos y genera el bundle de producción.
 
 Para ver los resultados: pestaña **Actions** del repositorio → flujo **CI** →

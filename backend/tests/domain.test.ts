@@ -28,6 +28,31 @@ describe("reglas de negocio (dominio)", () => {
     );
   });
 
+  it("trunca el máximo permitido a centavos para no superar el CHECK de PostgreSQL", () => {
+    expect(maxAllowedAmount(999.99)).toBe(399.99);
+    expect(maxAllowedAmount(1000)).toBe(400);
+    expect(maxAllowedAmount(2000)).toBe(800);
+  });
+
+  it("rechaza montos con más de dos decimales", () => {
+    const result = createRequestSchema.safeParse({
+      ...base,
+      amount: 9.99999999999999,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.message)).toContain(
+        "El monto admite como máximo 2 decimales",
+      );
+    }
+  });
+
+  it("rechaza ingresos con más de dos decimales", () => {
+    expect(
+      createRequestSchema.safeParse({ ...base, monthlyIncome: 2000.001 }).success,
+    ).toBe(false);
+  });
+
   it("calcula una amortización que cierra en saldo cero", () => {
     const result = buildAmortization(1000, 12);
     expect(result.monthlyPayment).toBeCloseTo(91.68, 2);

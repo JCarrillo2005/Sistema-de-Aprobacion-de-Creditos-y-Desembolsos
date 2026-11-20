@@ -19,8 +19,13 @@ export type RequestFormField = keyof RequestFormValues;
 export type RequestFormErrors = Partial<Record<RequestFormField, string>>;
 export type ValidRequest = CreateRequestPayload;
 
+/** El dinero solo admite 2 decimales (misma regla que el backend). */
+const hasAtMostTwoDecimals = (value: number): boolean =>
+  Number(value.toFixed(2)) === value;
+
 export function maxAllowedAmount(monthlyIncome: number): number {
-  return Math.round(monthlyIncome * MAX_DEBT_RATIO * 100) / 100;
+  // Truncar a centavos replica el backend y evita superar su CHECK exacto.
+  return Math.floor(Math.round(monthlyIncome * 100) * MAX_DEBT_RATIO) / 100;
 }
 
 // Porcentaje del ingreso mensual que representa el monto solicitado.
@@ -90,6 +95,8 @@ export function validateRequestForm(values: RequestFormValues): {
     errors.monthlyIncome = "El ingreso mensual debe ser mayor a 0";
   } else if (monthlyIncome > 10_000_000) {
     errors.monthlyIncome = "Ingreso mensual fuera de rango";
+  } else if (!hasAtMostTwoDecimals(monthlyIncome)) {
+    errors.monthlyIncome = "El ingreso mensual admite como máximo 2 decimales";
   }
 
   const amount = parseNumber(values.amount);
@@ -99,6 +106,8 @@ export function validateRequestForm(values: RequestFormValues): {
     errors.amount = "El monto debe ser mayor a 0";
   } else if (amount > 10_000_000) {
     errors.amount = "Monto fuera de rango";
+  } else if (!hasAtMostTwoDecimals(amount)) {
+    errors.amount = "El monto admite como máximo 2 decimales";
   } else if (
     monthlyIncome !== null &&
     monthlyIncome > 0 &&

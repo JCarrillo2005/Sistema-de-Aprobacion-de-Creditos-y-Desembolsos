@@ -742,7 +742,8 @@ textarea:focus {
 textarea {
   resize: vertical;
 }
-input[type="number"] {
+input[type="number"],
+.money-input {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -772,6 +773,9 @@ input[type="number"] {
 }
 .field-status--error {
   color: var(--rechazada-fg);
+}
+.field-status--info {
+  color: var(--muted);
 }
 .field-invalid input,
 .field-invalid select,
