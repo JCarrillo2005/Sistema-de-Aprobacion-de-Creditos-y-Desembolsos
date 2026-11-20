@@ -7,6 +7,13 @@ con reglas de negocio estrictas, consulta a un buró crediticio simulado
 (resiliente), flujo de aprobación con presupuesto global concurrente-seguro y
 auditoría inmutable con control de roles en el servidor.
 
+> **Alcance:** este repositorio es una **prueba técnica Full-Stack (nivel
+> mid-senior)** y una **demo**, no un sistema listo para producción. La
+> autenticación es de demostración (selector de usuarios sembrados, sin
+> contraseñas), el buró crediticio es simulado y los datos son ficticios. No
+> hay secretos reales: en producción habría que sustituir el login, el
+> `JWT_SECRET` y el proveedor de buró.
+
 ## Stack
 
 | Capa | Tecnología |
