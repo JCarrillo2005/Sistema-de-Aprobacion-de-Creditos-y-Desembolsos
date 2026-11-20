@@ -8,8 +8,10 @@ import {
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useBureauCheck, useCreateRequest, useDocumentStatus } from "../api/hooks";
+import type { RequestStatus } from "../api/types";
 import { AmortizationTable } from "../components/AmortizationTable";
 import { formatDateTime, formatMoney, formatPercent } from "../lib/format";
+import { statusLabel } from "../lib/labels";
 import {
   ALLOWED_TERMS,
   capacityUsedPercent,
@@ -109,6 +111,42 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   }, [value, delayMs]);
 
   return debounced;
+}
+
+interface HistoryBlockDetails {
+  blockingRequestId?: number;
+  blockingStatus?: RequestStatus;
+  blockedUntil?: string | null;
+}
+
+// Los detalles del 409 llegan como `unknown`; se leen con guardas en vez de
+// confiar en la forma del cuerpo del error.
+function readHistoryBlockDetails(details: unknown): HistoryBlockDetails {
+  if (typeof details !== "object" || details === null) {
+    return {};
+  }
+  const record = details as Record<string, unknown>;
+  const status = record.blockingStatus;
+  const knownStatus: RequestStatus | undefined =
+    status === "CREADA" ||
+    status === "EN_REVISION" ||
+    status === "APROBADA" ||
+    status === "RECHAZADA"
+      ? status
+      : undefined;
+  return {
+    blockingRequestId:
+      typeof record.blockingRequestId === "number"
+        ? record.blockingRequestId
+        : undefined,
+    blockingStatus: knownStatus,
+    blockedUntil:
+      typeof record.blockedUntil === "string"
+        ? record.blockedUntil
+        : record.blockedUntil === null
+          ? null
+          : undefined,
+  };
 }
 
 // Solo dígitos y separadores; recorta a 2 decimales mientras se escribe.
@@ -225,7 +263,7 @@ export default function NewRequestPage() {
     }
     return {
       tone: "ok",
-      text: `Formato válido · se registrará como ${debouncedDocument.toUpperCase()}`,
+      text: "Documento válido",
     };
   }, [debouncedDocument, values]);
 
@@ -239,7 +277,7 @@ export default function NewRequestPage() {
       return formatStatus;
     }
     if (documentFormatValid && documentCheck.isFetching && !documentCheck.data) {
-      return { tone: "info", text: "Verificando historial del documento…" };
+      return { tone: "info", text: "Verificando historial…" };
     }
     // Si está bloqueado, el detalle se muestra solo en el recuadro amarillo
     // que va debajo del campo; así no se duplica el mensaje.
@@ -249,7 +287,7 @@ export default function NewRequestPage() {
     if (documentCheck.data) {
       return {
         tone: "ok",
-        text: "Sin solicitudes pendientes ni rechazos en los últimos 30 días",
+        text: "Sin solicitudes activas ni rechazos recientes",
       };
     }
     return formatStatus;
@@ -316,13 +354,18 @@ export default function NewRequestPage() {
   const isHistoryBlock =
     serverError instanceof ApiError &&
     serverError.code === "RECENT_HISTORY_BLOCK";
+  const historyBlockDetails =
+    serverError instanceof ApiError &&
+    serverError.code === "RECENT_HISTORY_BLOCK"
+      ? readHistoryBlockDetails(serverError.details)
+      : {};
 
   return (
     <>
       <div className="page-header">
         <div>
-          <span className="eyebrow">Originación · solicitante</span>
-          <h2>Nueva solicitud de desembolso</h2>
+          <span className="eyebrow">Solicitud de crédito</span>
+          <h2>Nueva solicitud</h2>
         </div>
       </div>
 
@@ -357,20 +400,20 @@ export default function NewRequestPage() {
               onBlur={() => markTouched("documentId")}
               inputProps={{ maxLength: 20, placeholder: "Ej. DPI-1234567", spellCheck: false }}
             />
-            {documentBlocked && documentCheck.data?.message && (
+            {documentBlocked && documentCheck.data && (
               <div className="alert alert-warning alert-contained" role="alert">
                 <div className="alert-title">
                   <strong>
                     {documentCheck.data.blockingStatus === "RECHAZADA"
                       ? "Documento con rechazo reciente"
-                      : "Documento con solicitud pendiente"}
+                      : "Documento con solicitud activa"}
                   </strong>
-                  <code className="mono">
-                    Solicitud #{documentCheck.data.blockingRequestId ?? "—"} ·{" "}
-                    {documentCheck.data.blockingStatus ?? "PENDIENTE"}
-                  </code>
                 </div>
-                <p>{documentCheck.data.message}</p>
+                <p>
+                  {documentCheck.data.blockingStatus === "RECHAZADA"
+                    ? `La solicitud #${documentCheck.data.blockingRequestId ?? "—"} fue rechazada. El documento queda bloqueado durante 30 días desde su registro.`
+                    : `La solicitud #${documentCheck.data.blockingRequestId ?? "—"} sigue activa (${documentCheck.data.blockingStatus ? statusLabel(documentCheck.data.blockingStatus) : "en revisión"}). Debe resolverse antes de registrar otra.`}
+                </p>
                 {documentCheck.data.blockedUntil && (
                   <p className="alert-footnote">
                     Podrá volver a solicitar a partir de{" "}
@@ -419,7 +462,7 @@ export default function NewRequestPage() {
           </fieldset>
 
           <fieldset className="form-section">
-            <legend>03 · Estructura del préstamo</legend>
+            <legend>03 · Condiciones del crédito</legend>
             <div className={visibleError("termMonths") ? "field field-invalid" : "field"}>
               <label htmlFor="termMonths">Plazo del crédito</label>
               <select
@@ -445,13 +488,28 @@ export default function NewRequestPage() {
             <div className="alert alert-error" role="alert">
               <div className="alert-title">
                 <strong>
-                  {isHistoryBlock ? "Solicitud bloqueada por historial" : "No se pudo registrar"}
+                  {isHistoryBlock
+                    ? "No es posible registrar la solicitud"
+                    : "No pudimos registrar la solicitud"}
                 </strong>
-                {serverError instanceof ApiError && (
-                  <code className="mono">HTTP {serverError.status} · {serverError.code}</code>
-                )}
               </div>
-              <p>{serverError.message}</p>
+              {isHistoryBlock ? (
+                <>
+                  <p>
+                    {historyBlockDetails.blockingStatus === "RECHAZADA"
+                      ? `La solicitud #${historyBlockDetails.blockingRequestId ?? "—"} fue rechazada. El documento queda bloqueado durante 30 días desde su registro.`
+                      : `La solicitud #${historyBlockDetails.blockingRequestId ?? "—"} sigue activa. Debe resolverse antes de registrar otra.`}
+                  </p>
+                  {historyBlockDetails.blockedUntil && (
+                    <p className="alert-footnote">
+                      Podrá volver a solicitar a partir de{" "}
+                      {formatDateTime(historyBlockDetails.blockedUntil)}.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p>{serverError.message}</p>
+              )}
             </div>
           )}
 
@@ -476,12 +534,14 @@ export default function NewRequestPage() {
             <section className="panel simulator simulator--idle">
               <div className="panel-head">
                 <div>
-                  <span className="eyebrow">Simulador en vivo</span>
-                  <h3>Proyección de pago</h3>
+                  <span className="eyebrow">Cotización estimada</span>
+                  <h3>Plan de pagos</h3>
                 </div>
                 <span className="rate-chip mono">1.5 % / MES</span>
               </div>
-              <p className="muted">Monto y plazo para proyectar el cronograma.</p>
+              <p className="muted">
+                Ingresa monto y plazo para ver la cuota estimada.
+              </p>
               <div className="sim-placeholder mono" aria-hidden="true">
                 <span>$ ————</span>
                 <span>·</span>

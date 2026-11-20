@@ -1,27 +1,28 @@
 import type { RequestStatus } from "../api/types";
+import { statusLabel } from "../lib/labels";
 
-const LABELS: Record<RequestStatus, string> = {
-  CREADA: "Creada",
-  EN_REVISION: "En revisión",
-  APROBADA: "Aprobada",
-  RECHAZADA: "Rechazada",
-};
-
-// Semántica única de estados. El título expone el código exacto del dominio,
-// útil en tablas densas y para lectores de pantalla.
+// Semántica única de estados. El título conserva el código del dominio para
+// trazabilidad; la etiqueta visible usa lenguaje operativo.
 export function StatusBadge({ status }: { status: RequestStatus }) {
   const modifier = status.toLowerCase().replace("_", "-");
   return (
     <span
       className={`status-badge status-badge--${modifier}`}
-      title={`Estado: ${status}`}
+      title={`Estado: ${statusLabel(status)} (${status})`}
     >
       <span className="status-dot" aria-hidden="true" />
-      {LABELS[status]}
+      {statusLabel(status)}
     </span>
   );
 }
 
 export function StatusCode({ status }: { status: RequestStatus }) {
-  return <span className={`status-code status-code--${status.toLowerCase().replace("_", "-")}`}>{status}</span>;
+  return (
+    <span
+      className={`status-code status-code--${status.toLowerCase().replace("_", "-")}`}
+      title={`Código interno: ${status}`}
+    >
+      {statusLabel(status)}
+    </span>
+  );
 }

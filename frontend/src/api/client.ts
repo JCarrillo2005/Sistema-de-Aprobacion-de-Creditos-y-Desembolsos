@@ -51,7 +51,7 @@ interface ParsedError {
   details?: unknown;
 }
 
-function readError(payload: unknown, status: number): ParsedError {
+function readError(payload: unknown, _status: number): ParsedError {
   if (typeof payload === "object" && payload !== null && "error" in payload) {
     const inner = (payload as { error: unknown }).error;
     if (typeof inner === "object" && inner !== null) {
@@ -69,7 +69,7 @@ function readError(payload: unknown, status: number): ParsedError {
   }
   return {
     code: "UNKNOWN_ERROR",
-    message: `El servidor respondió con un error inesperado (HTTP ${status})`,
+    message: "No pudimos completar la operación. Intenta nuevamente.",
   };
 }
 
@@ -103,7 +103,7 @@ export async function request<T>(
     throw new ApiError(
       0,
       "NETWORK_ERROR",
-      "No se pudo conectar con el servidor",
+      "No pudimos conectar con el servicio. Revisa tu conexión e intenta nuevamente.",
     );
   }
 

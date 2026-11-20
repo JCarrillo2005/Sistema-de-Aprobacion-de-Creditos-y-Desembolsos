@@ -1,4 +1,4 @@
-# Sistema de Aprobación de Créditos y Desembolsos
+# Cauce — Sistema de Aprobación de Créditos y Desembolsos
 
 [![CI](https://github.com/JCarrillo2005/Sistema-de-Aprobacion-de-Creditos-y-Desembolsos/actions/workflows/ci.yml/badge.svg)](https://github.com/JCarrillo2005/Sistema-de-Aprobacion-de-Creditos-y-Desembolsos/actions/workflows/ci.yml)
 
@@ -23,9 +23,10 @@ con reglas de negocio estrictas, consulta a un buró crediticio simulado
 (resiliente), flujo de aprobación con presupuesto global concurrente-seguro y
 auditoría inmutable con control de roles en el servidor.
 
-> **Alcance:** este repositorio es una **prueba técnica Full-Stack (nivel
+> **Alcance:** la interfaz se presenta como **Cauce**, una mesa de crédito
+> interna. El repositorio sigue siendo una **prueba técnica Full-Stack (nivel
 > mid-senior)** y una **demo**, no un sistema listo para producción. La
-> autenticación es de demostración (selector de usuarios sembrados, sin
+> autenticación imita un SSO corporativo sobre usuarios sembrados (sin
 > contraseñas), el buró crediticio es simulado y los datos son ficticios. No
 > hay secretos reales: en producción habría que sustituir el login, el
 > `JWT_SECRET` y el proveedor de buró.
@@ -101,14 +102,15 @@ Si `credit_test` no existe porque el volumen de Postgres es anterior a
 
 ## Usuarios de prueba
 
-La pantalla de inicio es un selector de usuarios sembrados (autenticación de
-demostración, sin contraseñas):
+La pantalla de inicio imita el selector de cuentas de un SSO corporativo. Las
+cuentas están sembradas en la base y no usan contraseña (autenticación de
+demostración):
 
-| Usuario | Rol | Puede |
-| --- | --- | --- |
-| `sol-1` Ana Solicitante | SOLICITANTE | Crear y consultar **sus** solicitudes |
-| `sol-2` Luis Solicitante | SOLICITANTE | Ídem (para probar el aislamiento entre usuarios) |
-| `ana-1` Carla Analista | ANALISTA | Revisar, aprobar, rechazar, ver presupuesto y auditoría |
+| Usuario | Cuenta | Rol | Puede |
+| --- | --- | --- | --- |
+| `sol-1` | Ana López · `ana.lopez@cauce.internal` | SOLICITANTE | Crear y consultar **sus** solicitudes |
+| `sol-2` | Luis Ramírez · `luis.ramirez@cauce.internal` | SOLICITANTE | Ídem (para probar el aislamiento entre usuarios) |
+| `ana-1` | Carla Méndez · `carla.mendez@cauce.internal` | ANALISTA | Revisar, aprobar, rechazar, ver presupuesto y auditoría |
 
 ```bash
 # Con todo en contenedores
@@ -124,14 +126,14 @@ curl -s -X POST localhost:3000/api/auth/login \
 
 ## Flujo de prueba sugerido
 
-1. Entra como **Ana** y crea una solicitud (ej.: ingreso 2000, monto 800, 12
+1. Entra como **Ana López** y crea una solicitud (ej.: ingreso 2000, monto 800, 12
    meses). La tabla de amortización se calcula en vivo. Con monto 900 el
    formulario muestra el error del 40 %.
 2. Al crear, se lanza la consulta al buró en segundo plano: puedes navegar
    mientras el header muestra el indicador de consulta en curso.
 3. Intenta crear otra solicitud con el mismo documento: se bloquea con el
    motivo exacto y la fecha a partir de la cual puede volver a solicitar.
-4. Entra como **Carla**: toma la solicitud para revisión, apruébala (el
+4. Entra como **Carla Méndez**: toma la solicitud para revisión, apruébala (el
    presupuesto baja de 50 000 a 49 200) o recházala con un motivo de 15+
    caracteres.
 5. Revisa **Auditoría**: se actualiza sola cada 3 s. El detalle de la solicitud
@@ -164,7 +166,7 @@ curl -s -X POST localhost:3000/api/auth/login \
 | Método | Ruta | Rol | Descripción |
 | --- | --- | --- | --- |
 | GET | `/health` | — | Liveness (usado por el healthcheck de Docker) |
-| GET | `/api/auth/users` | — | Selector de usuarios demo |
+| GET | `/api/auth/users` | — | Selector de cuentas corporativas (demo SSO) |
 | POST | `/api/auth/login` | — | Devuelve JWT |
 | GET | `/api/auth/me` | ambos | Usuario autenticado (rol leído de la BD) |
 | POST | `/api/requests` | SOLICITANTE | Crear solicitud |

@@ -15,11 +15,11 @@ export function AmortizationTable({ principal, termMonths }: Props) {
   );
 
   return (
-    <section className="panel simulator" aria-label="Simulación financiera">
+    <section className="panel simulator" aria-label="Plan de amortización">
       <div className="panel-head">
         <div>
           <span className="eyebrow">Sistema francés · cuota fija</span>
-          <h3>Simulación financiera</h3>
+          <h3>Plan de amortización</h3>
         </div>
         <span className="rate-chip mono">
           {(MONTHLY_INTEREST_RATE * 100).toFixed(1)} % / MES
@@ -27,8 +27,10 @@ export function AmortizationTable({ principal, termMonths }: Props) {
       </div>
 
       <div className="sim-hero">
-        <span className="eyebrow">Cuota mensual estimada</span>
-        <p className="sim-hero-value mono">{formatMoney(result.monthlyPayment)}</p>
+        <span className="eyebrow">Cuota mensual</span>
+        <p className="sim-hero-value mono">
+          {formatMoney(result.monthlyPayment)}
+        </p>
         <span className="sim-hero-meta mono">
           {result.schedule.length} cuotas · tasa fija sobre saldo
         </span>
@@ -80,7 +82,9 @@ export function AmortizationTable({ principal, termMonths }: Props) {
         </div>
       </details>
 
-      <p className="fineprint mono">Estimación · tasa y sistema del servidor.</p>
+      <p className="fineprint mono">
+        Tasa fija mensual · sistema francés.
+      </p>
     </section>
   );
 }

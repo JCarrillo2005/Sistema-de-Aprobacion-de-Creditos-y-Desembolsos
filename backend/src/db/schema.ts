@@ -7,10 +7,16 @@
  */
 export const schemaSql = `
 CREATE TABLE IF NOT EXISTS users (
-  id   TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('SOLICITANTE', 'ANALISTA'))
+  id    TEXT PRIMARY KEY,
+  name  TEXT NOT NULL,
+  email TEXT,
+  role  TEXT NOT NULL CHECK (role IN ('SOLICITANTE', 'ANALISTA'))
 );
+
+-- Migración idempotente para volúmenes creados antes de existir la columna.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email
+  ON users (email) WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS budget (
   id        SMALLINT PRIMARY KEY CHECK (id = 1),
@@ -67,11 +73,13 @@ CREATE TRIGGER audit_log_immutable
   BEFORE UPDATE OR DELETE ON audit_log
   FOR EACH ROW EXECUTE FUNCTION audit_log_append_only();
 
-INSERT INTO users (id, name, role) VALUES
-  ('sol-1', 'Ana Solicitante', 'SOLICITANTE'),
-  ('sol-2', 'Luis Solicitante', 'SOLICITANTE'),
-  ('ana-1', 'Carla Analista', 'ANALISTA')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO users (id, name, email, role) VALUES
+  ('sol-1', 'Ana López', 'ana.lopez@cauce.internal', 'SOLICITANTE'),
+  ('sol-2', 'Luis Ramírez', 'luis.ramirez@cauce.internal', 'SOLICITANTE'),
+  ('ana-1', 'Carla Méndez', 'carla.mendez@cauce.internal', 'ANALISTA')
+ON CONFLICT (id) DO UPDATE
+  SET name = EXCLUDED.name,
+      email = EXCLUDED.email;
 
 INSERT INTO budget (id, available) VALUES (1, 50000.00)
 ON CONFLICT (id) DO NOTHING;

@@ -4,6 +4,7 @@ import { useRequests } from "../api/hooks";
 import type { CreditRequest } from "../api/types";
 import { LifecycleStepper } from "../components/LifecycleStepper";
 import { StatusBadge } from "../components/StatusBadge";
+import { UpdatedTag } from "../components/UpdatedTag";
 import { formatDateTime, formatMoney, formatPercent, formatRelativeAge } from "../lib/format";
 import { debtRatioPercent } from "../lib/rules";
 
@@ -16,7 +17,7 @@ interface FilterOption {
 
 const FILTERS: readonly FilterOption[] = [
   { key: "ALL", label: "Todas" },
-  { key: "CREADA", label: "Creadas" },
+  { key: "CREADA", label: "Recibidas" },
   { key: "EN_REVISION", label: "En revisión" },
   { key: "RESUELTAS", label: "Resueltas" },
 ];
@@ -66,10 +67,10 @@ export default function AnalystDashboardPage() {
     <>
       <div className="page-header">
         <div>
-          <span className="eyebrow">Analista · bandeja operativa</span>
+          <span className="eyebrow">Mesa de crédito · Analista</span>
           <h2>Bandeja de revisión</h2>
         </div>
-        <span className="sync-tag mono">ACTUALIZACIÓN 5s</span>
+        <UpdatedTag at={requestsQuery.dataUpdatedAt} />
       </div>
 
       <div className="filter-bar" role="group" aria-label="Filtros por estado">
@@ -88,8 +89,8 @@ export default function AnalystDashboardPage() {
       </div>
 
       <p className="page-note">
-        Riesgo de Endeudamiento = monto solicitado ÷ ingreso mensual declarado.
-        El límite normativo es 40 %.
+        La relación entre el monto solicitado y el ingreso declarado no puede
+        superar el 40 %. Las decisiones quedan registradas en auditoría.
       </p>
 
       {requestsQuery.isLoading && (
@@ -129,7 +130,7 @@ export default function AnalystDashboardPage() {
                   <th className="num">% Deuda</th>
                   <th className="num">Plazo</th>
                   <th>Estado</th>
-                  <th>Ciclo</th>
+                  <th>Etapa</th>
                   <th>Antigüedad</th>
                   <th />
                 </tr>

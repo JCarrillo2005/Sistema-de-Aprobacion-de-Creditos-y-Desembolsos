@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAudit } from "../api/hooks";
 import { TransitionBadge } from "../components/TransitionBadge";
 import { formatClockTime, formatDateTime } from "../lib/format";
+import { roleLabel } from "../lib/labels";
 
 export default function AuditPage() {
   const [requestIdInput, setRequestIdInput] = useState("");
@@ -19,14 +20,12 @@ export default function AuditPage() {
     <>
       <div className="page-header">
         <div>
-          <span className="eyebrow">Registro inmutable · solo inserción</span>
-          <h2>Bitácora forense</h2>
+          <span className="eyebrow">Auditoría · registro inmutable</span>
+          <h2>Registro de decisiones</h2>
         </div>
         <div className="ledger-status" role="status">
           <span className={audit.isError ? "live-dot live-dot--error" : "live-dot"} aria-hidden="true" />
-          <span>
-            {audit.isError ? "Sin sincronizar" : "En vivo / Sincronizado"}
-          </span>
+          <span>{audit.isError ? "No disponible" : "Actualizado"}</span>
           {audit.dataUpdatedAt > 0 && (
             <span className="mono">
               {formatClockTime(audit.dataUpdatedAt)}
@@ -36,16 +35,15 @@ export default function AuditPage() {
       </div>
 
       <p className="page-note">
-        Cada transición queda grabada con actor, rol, comentario y timestamp.
-        Las operaciones <span className="mono">UPDATE</span> y{" "}
-        <span className="mono">DELETE</span> están bloqueadas en la base de datos.
+        Cada transición queda grabada con usuario, rol, comentario y fecha. El
+        registro es de solo inserción: no admite ediciones ni borrados.
       </p>
 
       <section className="panel ledger" aria-label="Registro de auditoría">
         <div className="panel-head">
           <div>
             <span className="eyebrow">{audit.data?.length ?? 0} eventos</span>
-            <h3>Ledger de transiciones</h3>
+            <h3>Historial de transiciones</h3>
           </div>
           <label className="inline-field">
             <span className="eyebrow">Filtrar solicitud</span>
@@ -63,7 +61,7 @@ export default function AuditPage() {
 
         {audit.isLoading && (
           <div className="page-state" role="status">
-            <span className="spinner" aria-hidden="true" /> Cargando bitácora…
+            <span className="spinner" aria-hidden="true" /> Cargando historial…
           </div>
         )}
         {audit.isError && (
@@ -83,11 +81,11 @@ export default function AuditPage() {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Timestamp (ISO 8601)</th>
+                  <th>Fecha y hora</th>
                   <th>Transición</th>
-                  <th>Actor · rol</th>
+                  <th>Usuario · rol</th>
                   <th>Comentario</th>
-                  <th>Integridad</th>
+                  <th>Registro</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +95,7 @@ export default function AuditPage() {
                       <Link className="table-link" to={`/requests/${entry.requestId}`}>
                         #{entry.requestId}
                       </Link>
-                      <span className="table-sub mono">evt {entry.id}</span>
+                      <span className="table-sub mono">Evento {entry.id}</span>
                     </td>
                     <td>
                       <time dateTime={entry.occurredAt} title={entry.occurredAt}>
@@ -113,16 +111,16 @@ export default function AuditPage() {
                     </td>
                     <td>
                       <span className="table-primary">{entry.actorName}</span>
-                      <span className="table-sub mono">{entry.actorId}</span>
+                      <span className="table-sub mono">{entry.actorEmail ?? "—"}</span>
                       <span className={`role-badge role-${entry.actorRole.toLowerCase()}`}>
-                        {entry.actorRole}
+                        {roleLabel(entry.actorRole)}
                       </span>
                     </td>
                     <td className="comment-cell" title={entry.comment ?? ""}>
                       {entry.comment ?? "—"}
                     </td>
                     <td>
-                      <span className="immutable-badge mono">INMUTABLE</span>
+                      <span className="immutable-badge mono">Inmutable</span>
                     </td>
                   </tr>
                 ))}

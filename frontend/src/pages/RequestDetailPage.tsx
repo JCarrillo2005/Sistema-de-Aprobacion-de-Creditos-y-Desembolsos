@@ -16,7 +16,9 @@ import { BureauPanel } from "../components/BureauPanel";
 import { LifecycleStepper } from "../components/LifecycleStepper";
 import { StatusBadge } from "../components/StatusBadge";
 import { TransitionBadge } from "../components/TransitionBadge";
+import { UpdatedTag } from "../components/UpdatedTag";
 import { formatDateTime, formatMoney, formatPercent } from "../lib/format";
+import { roleLabel } from "../lib/labels";
 import {
   debtRatioPercent,
   MIN_REJECTION_REASON_LENGTH,
@@ -41,15 +43,15 @@ function Info({
 
 function RejectionNotice({ reason }: { reason: string }) {
   return (
-    <section className="alert alert-rejection" role="note" aria-label="Motivo oficial del rechazo">
+    <section className="alert alert-rejection" role="note" aria-label="Motivo del rechazo">
       <div className="alert-title">
-        <strong>Motivo oficial del analista</strong>
-        <span className="immutable-badge mono">REGISTRO AUDITADO</span>
+        <strong>Motivo del rechazo</strong>
+        <span className="immutable-badge mono">Registrado en auditoría</span>
       </div>
       <blockquote className="rejection-quote">{reason}</blockquote>
       <p className="alert-footnote">
-        Una solicitud rechazada bloquea nuevas solicitudes con este documento
-        durante 30 días desde su fecha de creación.
+        El documento no podrá registrar una nueva solicitud durante los
+        próximos 30 días.
       </p>
     </section>
   );
@@ -63,6 +65,7 @@ function ReviewActions({ request }: { request: CreditRequest }) {
   const budget = useBudget(5000);
 
   const [rejecting, setRejecting] = useState(false);
+  const [confirmingApprove, setConfirmingApprove] = useState(false);
   const [reason, setReason] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -77,6 +80,7 @@ function ReviewActions({ request }: { request: CreditRequest }) {
   function begin() {
     setNotice(null);
     setActionError(null);
+    setConfirmingApprove(false);
   }
 
   function handleStartReview() {
@@ -130,10 +134,10 @@ function ReviewActions({ request }: { request: CreditRequest }) {
     <section className="panel decision" aria-label="Zona de dictamen">
       <div className="panel-head">
         <div>
-          <span className="eyebrow">Acción del analista</span>
-          <h3>Zona de dictamen</h3>
+          <span className="eyebrow">Resolución</span>
+          <h3>Dictamen</h3>
         </div>
-        <span className="immutable-badge mono">AUDITADO</span>
+        <span className="immutable-badge mono">Registrado</span>
       </div>
 
       {notice && (
@@ -150,13 +154,13 @@ function ReviewActions({ request }: { request: CreditRequest }) {
       {isFinal && (
         <div className="decision-final">
           <StatusBadge status={request.status} />
-          <p>Estado final · sin reversiones.</p>
+          <p>Decisión final. No admite cambios.</p>
         </div>
       )}
 
       {request.status === "CREADA" && (
         <>
-          <p className="decision-copy">Sin tomar.</p>
+          <p className="decision-copy">Esta solicitud está pendiente de revisión.</p>
           <button
             type="button"
             className="btn btn-primary btn-block"
@@ -192,25 +196,60 @@ function ReviewActions({ request }: { request: CreditRequest }) {
             <div className="alert alert-warning alert-contained" id="decision-budget-warning" role="alert">
               <div className="alert-title">
                 <strong>Presupuesto insuficiente</strong>
-                <code className="mono">HTTP 422</code>
               </div>
               <p>
                 Solicitado <span className="mono">{formatMoney(request.amount)}</span>{" "}
                 · disponible{" "}
                 <span className="mono">{formatMoney(budget.data.available)}</span>.
+                La solicitud no puede aprobarse hasta que se libere presupuesto.
               </p>
             </div>
           )}
 
-          {!rejecting ? (
+          {confirmingApprove ? (
+            <div className="confirm-box" role="group" aria-label="Confirmar aprobación">
+              <div className="confirm-head">
+                <span className="eyebrow">Confirmación</span>
+                <strong>¿Aprobar esta solicitud?</strong>
+              </div>
+              <p>
+                Se descontarán{" "}
+                <span className="mono">{formatMoney(request.amount)}</span> del
+                presupuesto disponible. La decisión quedará registrada y no
+                podrá revertirse.
+              </p>
+              <div className="decision-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={busy || insufficient}
+                  aria-busy={approve.isPending}
+                  onClick={handleApprove}
+                >
+                  {approve.isPending ? "Aprobando…" : "Confirmar aprobación"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busy}
+                  onClick={() => setConfirmingApprove(false)}
+                >
+                  Volver
+                </button>
+              </div>
+            </div>
+          ) : !rejecting ? (
             <div className="decision-actions">
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={busy}
+                disabled={busy || insufficient}
                 aria-busy={approve.isPending}
                 aria-describedby={insufficient ? "decision-budget-warning" : undefined}
-                onClick={handleApprove}
+                onClick={() => {
+                  begin();
+                  setConfirmingApprove(true);
+                }}
               >
                 {approve.isPending
                   ? "Aprobando…"
@@ -230,16 +269,14 @@ function ReviewActions({ request }: { request: CreditRequest }) {
             </div>
           ) : (
             <div className="reject-form">
-              <label htmlFor="rejectReason">
-                Motivo oficial del rechazo
-              </label>
+              <label htmlFor="rejectReason">Motivo del rechazo</label>
               <textarea
                 id="rejectReason"
                 rows={4}
                 maxLength={500}
                 value={reason}
                 aria-describedby="reject-counter"
-                placeholder="Queda registrado en la bitácora."
+                placeholder="Describe el motivo con al menos 15 caracteres."
                 onChange={(event) => setReason(event.target.value)}
               />
               <div className="counter-row">
@@ -289,7 +326,7 @@ function RequestHistory({ requestId }: { requestId: number }) {
           <span className="eyebrow">Trazabilidad</span>
           <h3>Historial de auditoría</h3>
         </div>
-        <span className="sync-tag mono">SYNC 3s</span>
+        <UpdatedTag at={audit.dataUpdatedAt} />
       </div>
       {audit.isLoading && (
         <div className="page-state" role="status">
@@ -307,7 +344,7 @@ function RequestHistory({ requestId }: { requestId: number }) {
             <thead>
               <tr>
                 <th>Fecha</th>
-                <th>Actor</th>
+                <th>Usuario</th>
                 <th>Transición</th>
                 <th>Comentario</th>
               </tr>
@@ -323,7 +360,10 @@ function RequestHistory({ requestId }: { requestId: number }) {
                   <td>
                     <span className="table-primary">{entry.actorName}</span>
                     <span className="table-sub mono">
-                      {entry.actorId} · {entry.actorRole}
+                      {entry.actorEmail ?? "—"}
+                    </span>
+                    <span className={`role-badge role-${entry.actorRole.toLowerCase()}`}>
+                      {roleLabel(entry.actorRole)}
                     </span>
                   </td>
                   <td>
@@ -391,7 +431,7 @@ export default function RequestDetailPage() {
     <>
       <div className="page-header">
         <div>
-          <span className="eyebrow">Expediente · solicitud</span>
+          <span className="eyebrow">Expediente de crédito</span>
           <h2>
             <span className="mono">#{request.id}</span>{" "}
             <StatusBadge status={request.status} />
@@ -409,7 +449,7 @@ export default function RequestDetailPage() {
             <h3>{request.applicantName}</h3>
             <p className="mono muted">{request.documentId}</p>
           </div>
-          <span className="immutable-badge mono">SOLO LECTURA</span>
+          <span className="immutable-badge mono">Registro único</span>
         </div>
 
         <LifecycleStepper status={request.status} />
@@ -427,12 +467,12 @@ export default function RequestDetailPage() {
           <Info label="Plazo" numeric>
             {request.termMonths} meses
           </Info>
-          <Info label="Creada" numeric>
+          <Info label="Recibida" numeric>
             <time dateTime={request.createdAt} title={request.createdAt}>
               {formatDateTime(request.createdAt)}
             </time>
           </Info>
-          <Info label="Actualizada" numeric>
+          <Info label="Última actualización" numeric>
             <time dateTime={request.updatedAt} title={request.updatedAt}>
               {formatDateTime(request.updatedAt)}
             </time>
@@ -463,7 +503,7 @@ export default function RequestDetailPage() {
               </div>
               <p className="muted">
                 Un analista revisará la solicitud y registrará cada transición
-                en la bitácora inmutable. El resultado se reflejará aquí
+                en el historial de auditoría. El resultado se reflejará aquí
                 automáticamente.
               </p>
             </section>

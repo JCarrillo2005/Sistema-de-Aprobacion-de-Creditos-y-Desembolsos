@@ -48,7 +48,7 @@ export async function queryBureau(
         throw new AppError(
           502,
           "BUREAU_BAD_RESPONSE",
-          `El buró respondió con HTTP ${response.status}`,
+          "El buró de crédito devolvió una respuesta no válida.",
         );
       }
       lastReason = `HTTP ${response.status}`;
@@ -66,9 +66,12 @@ export async function queryBureau(
     }
   }
 
+  console.warn(
+    `[bureau] consulta agotada tras ${maxAttempts} intentos (${lastReason})`,
+  );
   throw new AppError(
     503,
     "BUREAU_UNAVAILABLE",
-    `El buró crediticio no respondió tras ${maxAttempts} intentos (${lastReason}). Intenta nuevamente en unos minutos.`,
+    "El buró de crédito no está disponible en este momento. Intenta nuevamente en unos minutos.",
   );
 }

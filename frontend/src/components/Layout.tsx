@@ -1,9 +1,8 @@
 import { useMutationState } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useUsers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
-import { homePathFor } from "../lib/routes";
+import { initials, roleLabel } from "../lib/labels";
 import { BudgetWidget } from "./BudgetWidget";
 
 interface NavItem {
@@ -15,30 +14,29 @@ interface NavItem {
 
 function sectionLabel(pathname: string): string {
   if (pathname.startsWith("/analyst")) {
-    return "Estación de analista";
+    return "Bandeja de revisión";
   }
   if (pathname.startsWith("/audit")) {
-    return "Bitácora de auditoría";
+    return "Auditoría";
   }
   if (pathname === "/requests/new") {
     return "Nueva solicitud";
   }
   if (pathname.startsWith("/requests/")) {
-    return "Detalle de solicitud";
+    return "Expediente de crédito";
   }
   if (pathname.startsWith("/requests")) {
     return "Mis solicitudes";
   }
-  return "Consola";
+  return "Inicio";
 }
 
 export function Layout() {
-  const { user, login, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const usersQuery = useUsers();
-  const [switching, setSwitching] = useState<string | null>(null);
-  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   // Las consultas al buró viven en el caché global: el usuario puede navegar mientras tanto.
   const pendingBureau = useMutationState({
@@ -46,22 +44,34 @@ export function Layout() {
     select: (mutation) => mutation.state.variables as number | undefined,
   });
 
-  // La identidad y el rol del usuario nunca se leen del cliente: login() vuelve
-  // a consultar /auth/me en el servidor antes de cambiar la sesión.
-  async function handleSwitch(userId: string) {
-    setSwitching(userId);
-    setSwitchError(null);
-    try {
-      const next = await login(userId);
-      navigate(homePathFor(next.role), { replace: true });
-    } catch (error) {
-      setSwitchError(error instanceof Error ? error.message : "No se pudo cambiar de sesión");
-    } finally {
-      setSwitching(null);
+  useEffect(() => {
+    if (!profileOpen) {
+      return;
     }
-  }
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        profileRef.current &&
+        event.target instanceof Node &&
+        !profileRef.current.contains(event.target)
+      ) {
+        setProfileOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileOpen]);
 
   function handleLogout() {
+    setProfileOpen(false);
     logout();
     navigate("/login", { replace: true });
   }
@@ -74,21 +84,24 @@ export function Layout() {
   const links: NavItem[] = isAnalyst
     ? [
         { to: "/analyst", label: "Bandeja de revisión", index: "01", end: true },
-        { to: "/audit", label: "Bitácora forense", index: "02" },
+        { to: "/audit", label: "Auditoría", index: "02" },
       ]
     : [
         { to: "/requests", label: "Mis solicitudes", index: "01", end: true },
         { to: "/requests/new", label: "Nueva solicitud", index: "02" },
       ];
 
-  const sessionOptions = usersQuery.data ?? (user ? [user] : []);
-
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <strong>Créditos &amp; Desembolsos</strong>
-          <span className="eyebrow">LEDGER OPERATIVO · DEMO</span>
+          <span className="brand-mark" aria-hidden="true">
+            C
+          </span>
+          <div className="brand-lockup">
+            <strong>Cauce</strong>
+            <span className="eyebrow">Mesa de crédito</span>
+          </div>
         </div>
 
         <nav className="side-nav" aria-label="Navegación principal">
@@ -111,57 +124,103 @@ export function Layout() {
         <div className="sidebar-bottom">
           {isAnalyst && <BudgetWidget />}
 
-          <section className="session-card" aria-label="Sesión de demostración">
-            <div className="session-card-head">
-              <span className="eyebrow">Sesión demo</span>
-              <span className={`role-badge role-${user.role.toLowerCase()}`}>
-                {user.role}
+          <section className="session-card" aria-label="Sesión activa">
+            <div className="session-profile">
+              <span className="avatar" aria-hidden="true">
+                {initials(user.name)}
               </span>
+              <div className="session-identity">
+                <strong className="session-name">{user.name}</strong>
+                <span className="session-email mono">
+                  {user.email ?? roleLabel(user.role)}
+                </span>
+              </div>
             </div>
-            <select
-              className="session-select mono"
-              aria-label="Cambiar usuario de demostración"
-              value={user.id}
-              disabled={switching !== null}
-              onChange={(event) => void handleSwitch(event.target.value)}
-            >
-              {sessionOptions.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.id} · {candidate.role}
-                </option>
-              ))}
-            </select>
-            {switchError && (
-              <p className="session-error" role="alert">
-                {switchError}
-              </p>
-            )}
-            <button type="button" className="link-button" onClick={handleLogout}>
-              Cerrar sesión
-            </button>
+            <div className="session-actions">
+              <span className={`role-badge role-${user.role.toLowerCase()}`}>
+                {roleLabel(user.role)}
+              </span>
+              <button type="button" className="link-button" onClick={handleLogout}>
+                Cerrar sesión
+              </button>
+            </div>
           </section>
+
+          <p className="sidebar-foot">Uso interno · © 2026 Cauce</p>
         </div>
       </aside>
 
       <div className="main-column">
         <header className="topbar">
           <div className="topbar-context">
-            <span className="eyebrow">Módulo activo</span>
+            <span className="eyebrow">Sección</span>
             <strong>{sectionLabel(location.pathname)}</strong>
           </div>
 
           {pendingBureau.length > 0 && (
             <span className="bureau-ticker" role="status">
               <span className="spinner" aria-hidden="true" />
-              Buró en consulta · solicitud #{pendingBureau[0] ?? "—"}
+              Buró de crédito en consulta · #{pendingBureau[0] ?? "—"}
             </span>
           )}
 
           {isAnalyst && <BudgetWidget variant="chip" />}
 
-          <div className="topbar-user">
-            <span className="mono">{user.id}</span>
-            <span className="topbar-user-name">{user.name}</span>
+          <div className="topbar-user" ref={profileRef}>
+            <button
+              type="button"
+              className="profile-trigger"
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              aria-controls="profile-menu"
+              onClick={() => setProfileOpen((open) => !open)}
+            >
+              <span className="topbar-user-identity">
+                <strong className="topbar-user-name">{user.name}</strong>
+                <span className="topbar-user-role">{roleLabel(user.role)}</span>
+              </span>
+              <span className="avatar avatar--sm" aria-hidden="true">
+                {initials(user.name)}
+              </span>
+              <span className="profile-chevron" aria-hidden="true">
+                ▾
+              </span>
+            </button>
+
+            {profileOpen && (
+              <div
+                id="profile-menu"
+                className="profile-dropdown"
+                role="menu"
+                aria-label="Cuenta"
+              >
+                <div className="profile-dropdown-head">
+                  <span className="avatar" aria-hidden="true">
+                    {initials(user.name)}
+                  </span>
+                  <div>
+                    <strong>{user.name}</strong>
+                    <span className="mono">
+                      {user.email ?? roleLabel(user.role)}
+                    </span>
+                  </div>
+                </div>
+                <div className="profile-dropdown-role">
+                  <span className={`role-badge role-${user.role.toLowerCase()}`}>
+                    {roleLabel(user.role)}
+                  </span>
+                  <span className="muted">Sesión activa</span>
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="profile-menu-item"
+                  onClick={handleLogout}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

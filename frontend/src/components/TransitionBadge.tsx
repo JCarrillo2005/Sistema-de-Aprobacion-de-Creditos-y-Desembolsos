@@ -13,7 +13,7 @@ export function TransitionBadge({ fromStatus, toStatus }: Props) {
       {fromStatus ? (
         <StatusCode status={fromStatus} />
       ) : (
-        <span className="status-code status-code--origin">ORIGEN</span>
+        <span className="status-code status-code--origin">Alta</span>
       )}
       <span className="transition-arrow" aria-hidden="true">
         →

@@ -310,7 +310,7 @@ export async function applyTransition(
       throw new AppError(
         409,
         "INVALID_TRANSITION",
-        `Transición no permitida: la solicitud #${requestId} está en ${current.status} y no puede pasar a ${to}`,
+        `La solicitud #${requestId} ya no está disponible para esta acción.`,
         { currentStatus: current.status, requestedStatus: to },
       );
     }

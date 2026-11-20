@@ -19,7 +19,7 @@ function stepIndex(status: RequestStatus): number {
 // No hay reversiones: el último nodo se colorea según el desenlace.
 export function LifecycleStepper({ status, compact = false }: Props) {
   const finalLabel = status === "RECHAZADA" ? "Rechazada" : "Aprobada";
-  const labels = ["Creada", "En revisión", finalLabel];
+  const labels = ["Recibida", "En revisión", finalLabel];
   const current = stepIndex(status);
   const outcome =
     status === "RECHAZADA" ? "rejected" : status === "APROBADA" ? "approved" : "open";

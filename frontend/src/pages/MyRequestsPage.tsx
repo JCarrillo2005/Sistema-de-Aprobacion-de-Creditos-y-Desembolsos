@@ -2,11 +2,12 @@ import { Link } from "react-router-dom";
 import { useRequests } from "../api/hooks";
 import { LifecycleStepper } from "../components/LifecycleStepper";
 import { StatusBadge } from "../components/StatusBadge";
+import { UpdatedTag } from "../components/UpdatedTag";
 import { formatDateTime, formatMoney, formatPercent, formatRelativeAge } from "../lib/format";
 import { debtRatioPercent } from "../lib/rules";
 
 export default function MyRequestsPage() {
-  const { data, isLoading, isError, error } = useRequests({
+  const { data, dataUpdatedAt, isLoading, isError, error } = useRequests({
     refetchInterval: 5000,
   });
 
@@ -14,7 +15,7 @@ export default function MyRequestsPage() {
     <>
       <div className="page-header">
         <div>
-          <span className="eyebrow">Solicitante · cartera propia</span>
+          <span className="eyebrow">Solicitudes de crédito</span>
           <h2>Mis solicitudes</h2>
         </div>
         <Link to="/requests/new" className="btn btn-primary">
@@ -42,8 +43,8 @@ export default function MyRequestsPage() {
         <section className="panel empty-state">
           <h3>Sin solicitudes registradas</h3>
           <p className="muted">
-            Completa el formulario para simular tu primer crédito y ver la
-            proyección financiera antes de enviarlo.
+            Completa el formulario para registrar tu primera solicitud y revisar
+            el plan de pagos antes de enviarla.
           </p>
           <Link to="/requests/new" className="btn btn-secondary">
             Crear la primera solicitud
@@ -55,10 +56,10 @@ export default function MyRequestsPage() {
         <section className="panel" aria-label="Listado de solicitudes">
           <div className="panel-head">
             <div>
-              <span className="eyebrow">{data.length} registros</span>
+              <span className="eyebrow">{data.length} solicitudes</span>
               <h3>Historial de solicitudes</h3>
             </div>
-            <span className="sync-tag mono">SYNC 5s</span>
+            <UpdatedTag at={dataUpdatedAt} />
           </div>
           <div className="table-scroll">
             <table className="table">
@@ -70,8 +71,8 @@ export default function MyRequestsPage() {
                   <th className="num">Endeudamiento</th>
                   <th className="num">Plazo</th>
                   <th>Estado</th>
-                  <th>Ciclo</th>
-                  <th>Creada</th>
+                  <th>Etapa</th>
+                  <th>Recibida</th>
                   <th />
                 </tr>
               </thead>

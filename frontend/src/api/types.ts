@@ -12,6 +12,7 @@ export const REQUEST_STATUSES: readonly RequestStatus[] = [
 export interface AuthUser {
   id: string;
   name: string;
+  email: string | null;
   role: Role;
 }
 
@@ -37,6 +38,7 @@ export interface AuditEntry {
   requestId: number;
   actorId: string;
   actorName: string;
+  actorEmail: string | null;
   actorRole: Role;
   occurredAt: string;
   fromStatus: RequestStatus | null;

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useUsers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
+import { initials, roleLabel } from "../lib/labels";
 import { homePathFor } from "../lib/routes";
 
 export default function LoginPage() {
@@ -32,85 +33,135 @@ export default function LoginPage() {
   }
 
   const users = usersQuery.data ?? [];
+  const hasUsers = users.length > 0;
 
   return (
     <div className="login-shell">
-      <section className="login-aside" aria-label="Acerca del sistema">
-        <div>
-          <span className="eyebrow">Consola de crédito · entorno de prueba</span>
-          <h1>Aprobación de créditos y desembolsos</h1>
+      <section className="login-aside" aria-label="Acerca de Cauce">
+        <div className="login-aside-top">
+          <div className="login-brand">
+            <span className="brand-mark brand-mark--lg" aria-hidden="true">
+              C
+            </span>
+            <span className="eyebrow">Cauce · Mesa de crédito</span>
+          </div>
+          <h1>Originación y desembolsos bajo control.</h1>
           <p className="login-lede">
-            Una bitácora operativa para originar, evaluar y comprometer
-            desembolsos con trazabilidad completa.
+            Evalúa solicitudes, administra el presupuesto y conserva la
+            trazabilidad de cada decisión.
           </p>
         </div>
-        <dl className="login-facts">
-          <div>
-            <dt>Regla de capacidad</dt>
-            <dd className="mono">40 % del ingreso mensual</dd>
-          </div>
-          <div>
-            <dt>Presupuesto global</dt>
-            <dd className="mono">$50,000.00 USD</dd>
-          </div>
-          <div>
-            <dt>Auditoría</dt>
-            <dd className="mono">Solo inserción · inmutable</dd>
-          </div>
-        </dl>
-        <p className="fineprint mono">Selector demo · sin credenciales.</p>
+
+        <div className="login-aside-bottom">
+          <dl className="login-facts">
+            <div>
+              <dt>Acceso</dt>
+              <dd>SSO corporativo</dd>
+            </div>
+            <div>
+              <dt>Perfiles</dt>
+              <dd>Operación y análisis</dd>
+            </div>
+            <div>
+              <dt>Auditoría</dt>
+              <dd>Registro inmutable</dd>
+            </div>
+          </dl>
+          <p className="fineprint mono">Uso interno · © 2026 Cauce</p>
+        </div>
       </section>
 
       <main className="login-main">
         <div className="panel login-panel">
           <div className="panel-head">
             <div>
-              <span className="eyebrow">Acceso</span>
-              <h2>Selecciona una sesión</h2>
+              <span className="eyebrow">Acceso seguro</span>
+              <h2>Inicia sesión</h2>
             </div>
-            <span className="immutable-badge mono">DEMO</span>
+            <span className="immutable-badge mono">SSO</span>
           </div>
+
+          <p className="login-note">
+            Selecciona tu cuenta corporativa para continuar.
+          </p>
 
           {usersQuery.isLoading && (
             <div className="page-state" role="status">
               <span className="spinner" aria-hidden="true" />
-              Cargando usuarios…
+              Cargando cuentas…
             </div>
           )}
+
           {usersQuery.isError && (
             <div className="alert alert-error" role="alert">
-              {usersQuery.error.message}
+              <p>No pudimos cargar las cuentas corporativas.</p>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void usersQuery.refetch()}
+              >
+                Reintentar
+              </button>
             </div>
           )}
+
           {error && (
             <div className="alert alert-error" role="alert">
               {error}
             </div>
           )}
 
-          <ul className="login-list">
-            {users.map((candidate) => (
-              <li key={candidate.id}>
-                <button
-                  type="button"
-                  className="login-option"
-                  disabled={pendingId !== null}
-                  onClick={() => void handleLogin(candidate.id)}
-                >
-                  <span className="login-option-id mono">{candidate.id}</span>
-                  <span className="login-option-name">{candidate.name}</span>
-                  <span
-                    className={`role-badge role-${candidate.role.toLowerCase()}`}
-                  >
-                    {candidate.role}
-                  </span>
-                  {pendingId === candidate.id && (
-                    <span className="spinner" aria-hidden="true" />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+          {!usersQuery.isLoading && !usersQuery.isError && !hasUsers && (
+            <div className="empty-state empty-state--inline">
+              <p className="muted">
+                No hay cuentas habilitadas. Contacta a soporte de TI.
+              </p>
+            </div>
+          )}
+
+          {hasUsers && (
+            <ul className="login-list">
+              {users.map((candidate) => {
+                const pending = pendingId === candidate.id;
+                return (
+                  <li key={candidate.id}>
+                    <button
+                      type="button"
+                      className="login-option"
+                      disabled={pendingId !== null}
+                      aria-busy={pending}
+                      aria-label={`Entrar como ${candidate.name}`}
+                      onClick={() => void handleLogin(candidate.id)}
+                    >
+                      <span className="avatar" aria-hidden="true">
+                        {initials(candidate.name)}
+                      </span>
+                      <span className="login-option-identity">
+                        <span className="login-option-name">
+                          {candidate.name}
+                        </span>
+                        <span className="login-option-email mono">
+                          {candidate.email ?? "Cuenta corporativa"}
+                        </span>
+                      </span>
+                      <span
+                        className={`role-badge role-${candidate.role.toLowerCase()}`}
+                      >
+                        {roleLabel(candidate.role)}
+                      </span>
+                      <span className="login-option-action" aria-hidden="true">
+                        {pending ? <span className="spinner" /> : "→"}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <p className="login-support">
+            ¿Problemas para acceder? Contacta a soporte de TI.
+          </p>
         </div>
       </main>
     </div>

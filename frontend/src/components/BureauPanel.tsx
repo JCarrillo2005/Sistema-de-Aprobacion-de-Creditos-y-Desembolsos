@@ -1,5 +1,4 @@
 import { useBureauCheck, useBureauState } from "../api/hooks";
-import { ApiError } from "../api/client";
 import type { CreditRequest } from "../api/types";
 import { formatDateTime } from "../lib/format";
 
@@ -21,14 +20,13 @@ export function BureauPanel({ request }: { request: CreditRequest }) {
   const { pending, error } = useBureauState(request.id);
   const risk = normalizeRisk(request.bureauRisk);
   const hasResult = request.bureauScore !== null && risk !== null;
-  const errorCode = error instanceof ApiError ? error.code : "ERROR";
 
   return (
     <section className="panel bureau" aria-label="Buró crediticio">
       <div className="panel-head">
         <div>
-          <span className="eyebrow">Fuente externa · no bloqueante</span>
-          <h3>Buró crediticio</h3>
+          <span className="eyebrow">Consulta externa</span>
+          <h3>Buró de crédito</h3>
         </div>
         <button
           type="button"
@@ -49,8 +47,8 @@ export function BureauPanel({ request }: { request: CreditRequest }) {
           <div className="skeleton skeleton--line skeleton--short" />
           <p className="bureau-loading-note">
             <span className="spinner" aria-hidden="true" />
-            Consultando buró crediticio… reintento automático por latencia o
-            503 (hasta 4 intentos). Puedes seguir navegando.
+            Consultando el buró de crédito. Si la respuesta tarda,
+            reintentaremos automáticamente. Puedes seguir navegando.
           </p>
         </div>
       )}
@@ -59,7 +57,6 @@ export function BureauPanel({ request }: { request: CreditRequest }) {
         <div className="alert alert-error alert-contained" role="alert">
           <div className="alert-title">
             <strong>Consulta no disponible</strong>
-            <code className="mono">{errorCode}</code>
           </div>
           <p>{error.message}</p>
           <button
@@ -67,10 +64,10 @@ export function BureauPanel({ request }: { request: CreditRequest }) {
             className="btn btn-secondary btn-sm"
             onClick={() => bureau.mutate(request.id)}
           >
-            Reintentar manualmente
+            Reintentar
           </button>
           <p className="alert-footnote">
-            Esta consulta no es obligatoria para aprobar o rechazar la solicitud.
+            La consulta es informativa y no condiciona el dictamen.
           </p>
         </div>
       )}
@@ -101,8 +98,8 @@ export function BureauPanel({ request }: { request: CreditRequest }) {
               <dd className="mono">{request.documentId}</dd>
             </div>
             <div>
-              <dt>Intentos del cliente</dt>
-              <dd className="mono">{bureau.data?.bureau.attempts ?? "—"}</dd>
+              <dt>Fuente</dt>
+              <dd>Buró de crédito</dd>
             </div>
             <div>
               <dt>Última consulta</dt>
@@ -128,8 +125,8 @@ export function BureauPanel({ request }: { request: CreditRequest }) {
         <div className="bureau-idle">
           <p className="mono">{request.documentId}</p>
           <p>
-            Sin historial externo para esta solicitud. La consulta es
-            informativa: el dictamen no depende de su resultado.
+            Aún no se ha consultado el buró para esta solicitud. La consulta es
+            informativa y no condiciona el dictamen.
           </p>
         </div>
       )}

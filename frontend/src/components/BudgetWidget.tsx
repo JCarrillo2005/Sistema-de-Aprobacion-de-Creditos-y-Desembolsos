@@ -1,5 +1,6 @@
 import { useBudget } from "../api/hooks";
 import { formatMoney, formatPercent } from "../lib/format";
+import { UpdatedTag } from "./UpdatedTag";
 
 interface Props {
   variant?: "sidebar" | "chip";
@@ -31,7 +32,7 @@ export function BudgetWidget({ variant = "sidebar" }: Props) {
     <section className="budget-widget" aria-label="Presupuesto global disponible">
       <div className="budget-widget-head">
         <span className="eyebrow">Presupuesto global</span>
-        <span className="sync-tag mono">SYNC 5s</span>
+        <UpdatedTag at={budget.dataUpdatedAt} />
       </div>
       {budget.isLoading && <p className="budget-widget-loading">Cargando…</p>}
       {budget.isError && (

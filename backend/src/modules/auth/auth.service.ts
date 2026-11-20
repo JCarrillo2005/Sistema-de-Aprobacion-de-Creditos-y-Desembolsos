@@ -6,25 +6,29 @@ import { AuthUser, Role } from "../../domain/types";
 interface UserRow {
   id: string;
   name: string;
+  email: string | null;
   role: Role;
 }
 
 export async function findUserById(id: string): Promise<AuthUser | null> {
   const result = await pool.query<UserRow>(
-    "SELECT id, name, role FROM users WHERE id = $1",
+    "SELECT id, name, email, role FROM users WHERE id = $1",
     [id],
   );
   const row = result.rows[0];
-  return row ? { id: row.id, name: row.name, role: row.role } : null;
+  return row
+    ? { id: row.id, name: row.name, email: row.email, role: row.role }
+    : null;
 }
 
 export async function listUsers(): Promise<AuthUser[]> {
   const result = await pool.query<UserRow>(
-    "SELECT id, name, role FROM users ORDER BY role, name",
+    "SELECT id, name, email, role FROM users ORDER BY CASE role WHEN 'SOLICITANTE' THEN 0 ELSE 1 END, name",
   );
   return result.rows.map((row) => ({
     id: row.id,
     name: row.name,
+    email: row.email,
     role: row.role,
   }));
 }
